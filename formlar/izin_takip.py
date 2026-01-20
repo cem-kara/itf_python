@@ -46,7 +46,7 @@ class VeriYukleyici(QThread):
             'izin_tipleri': [],
             'personel': [], 
             'izinler': [],
-            'izin_bilgi': [] # Bakiye Bilgisi
+            'izin_bilgi': []
         }
         try:
             # 1. SABİTLER
@@ -79,7 +79,7 @@ class VeriYukleyici(QThread):
                     ad = str(p.get('Ad_Soyad', '')).strip()
                     sinif = str(p.get('Hizmet_Sinifi', '')).strip()
                     
-                    if ad:
+                    if ad: 
                         pers_list.append({'ad': ad, 'tc': tc, 'sinif': sinif})
             
             data['personel'] = pers_list
@@ -88,8 +88,7 @@ class VeriYukleyici(QThread):
             tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
             data['izinler'] = tum_izinler if tum_izinler else []
 
-            # 4. İZİN BİLGİ (BAKİYE) - YENİ SÜTUN YAPISI
-            # No, Kimlik_No, Ad_Soyad, Hak_Edilen, Devir, ToplamKullanilan, Kalan, Hak_Edilen_sua, Kullanilan_sua
+            # 4. İZİN BİLGİ (BAKİYE)
             bakiye = kayitlari_getir(veritabani_getir, 'personel', 'izin_bilgi')
             data['izin_bilgi'] = bakiye if bakiye else []
 
@@ -99,7 +98,7 @@ class VeriYukleyici(QThread):
         self.veri_hazir.emit(data)
 
 # =============================================================================
-# WORKER: KAYIT / GÜNCELLEME (HESAPLAMA MANTIĞI GÜNCELLENDİ)
+# WORKER: KAYIT / GÜNCELLEME (YIL İÇİ TOPLAMLAR EKLENDİ)
 # =============================================================================
 class KayitWorker(QThread):
     islem_tamam = Signal()
@@ -112,7 +111,7 @@ class KayitWorker(QThread):
 
     def run(self):
         try:
-            # A. İzin Giriş Tablosuna Kayıt
+            # --- A. İZİN GİRİŞ TABLOSUNA KAYIT ---
             ws_giris = veritabani_getir('personel', 'izin_giris')
             if not ws_giris: raise Exception("izin_giris tablosuna erişilemedi.")
 
@@ -136,66 +135,120 @@ class KayitWorker(QThread):
                 else:
                     raise Exception("Güncellenecek kayıt bulunamadı.")
 
-            # B. İzin Bilgi (Bakiye) Güncelleme (Sadece Yeni Kayıtta)
+            # --- B. İZİN BİLGİ (BAKİYE & YIL TOPLAMLARI) GÜNCELLEME ---
             if self.tip == "yeni":
                 ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
-                tc_kimlik = str(self.data.get('personel_id')).strip()
-                izin_tipi = str(self.data.get('izin_tipi')).strip().upper()
-                gun_sayisi = int(self.data.get('Gun', 0))
-
-                # Kişiyi Bul (Kimlik_No ile)
-                cell_personel = ws_bilgi.find(tc_kimlik)
                 
-                if cell_personel:
-                    row_idx = cell_personel.row
-                    
-                    # Sütun İndeksleri (1-tabanlı):
-                    # 1:No, 2:Kimlik_No, 3:Ad_Soyad, 4:Hak_Edilen, 5:Devir, 
-                    # 6:ToplamKullanilan, 7:Kalan, 8:Hak_Edilen_sua, 9:Kullanilan_sua
-                    
-                    def get_int(idx):
-                        val = ws_bilgi.cell(row_idx, idx).value
-                        return int(val) if val and str(val).isdigit() else 0
+                hedef_tc = str(self.data.get('personel_id')).strip()
+                izin_tipi = str(self.data.get('izin_tipi')).strip().lower() # Küçük harfe çevir
+                gun_sayisi = int(self.data.get('Gun', 0))
+                baslama_tarihi_str = str(self.data.get('Baslama_Tarihi'))
 
-                    if izin_tipi == "YILLIK İZİN":
-                        hak_edilen = get_int(4)
-                        devir = get_int(5)
-                        kullanilan = get_int(6)
+                # Tarih Kontrolü (Yıl Hesabı İçin)
+                try:
+                    tarih_obj = datetime.strptime(baslama_tarihi_str, "%d.%m.%Y")
+                    izin_yili = tarih_obj.year
+                    suanki_yil = datetime.now().year
+                except:
+                    izin_yili = 0
+                    suanki_yil = 1
+
+                # 1. ADIM: TC Kimlik Numarasına göre satırı bul
+                try:
+                    kimlik_kolonu = ws_bilgi.col_values(2) # 2. Sütun = Kimlik_No
+                    row_idx = kimlik_kolonu.index(hedef_tc) + 1 
+                except ValueError:
+                    row_idx = None
+
+                if row_idx:
+                    # Sütun İndeksleri:
+                    # 4: Hak_Edilen, 5: Devir, 7: Kullanilan, 8: Kalan, 10: Kullanilan_sua
+                    # YENİ SÜTUNLAR (Tahmini):
+                    # 11: Bu Yıl Yıllık İzin Toplamı
+                    # 12: Bu Yıl Diğer İzin Toplamı
+                    
+                    def safe_int(row, col):
+                        val = ws_bilgi.cell(row, col).value
+                        if val and str(val).replace('.', '', 1).isdigit():
+                            return int(float(val))
+                        return 0
+
+                    # ---------------------------------------------------------
+                    # 1. SENARYO: YILLIK İZİN
+                    # ---------------------------------------------------------
+                    if "yıllık" in izin_tipi:
+                        hak_edilen = safe_int(row_idx, 4)
+                        devir = safe_int(row_idx, 5)
+                        kullanilan = safe_int(row_idx, 7) # Genel Toplam Kullanılan
                         
-                        # Kullanılanı artır
-                        yeni_kullanilan = kullanilan + gun_sayisi
+                        # Genel Kullanılanı artır
+                        ws_bilgi.update_cell(row_idx, 7, kullanilan + gun_sayisi)
                         
-                        # Düşme Mantığı: Önce Devirden, Sonra Haktan
-                        kalan_dusulecek = gun_sayisi
+                        # --- Düşme Mantığı (Devir -> Hak) ---
+                        dusulecek = gun_sayisi
                         
-                        if devir >= kalan_dusulecek:
-                            devir -= kalan_dusulecek
-                            kalan_dusulecek = 0
+                        # Önce devirden düş
+                        if devir >= dusulecek:
+                            devir -= dusulecek
+                            dusulecek = 0
                         else:
-                            kalan_dusulecek -= devir
+                            dusulecek -= devir
                             devir = 0
                         
-                        # Devir bittiyse haktan düş
-                        hak_edilen -= kalan_dusulecek
+                        # Kalanı haktan düş
+                        hak_edilen -= dusulecek
                         
-                        # Kalanı Hesapla (Yeni Hak + Yeni Devir)
+                        # Yeni Kalan (Hak + Devir)
                         yeni_kalan = hak_edilen + devir
                         
-                        # Veritabanına Yaz
-                        ws_bilgi.update_cell(row_idx, 4, hak_edilen) # Hak_Edilen
-                        ws_bilgi.update_cell(row_idx, 5, devir)      # Devir
-                        ws_bilgi.update_cell(row_idx, 6, yeni_kullanilan) # ToplamKullanilan
-                        ws_bilgi.update_cell(row_idx, 7, yeni_kalan) # Kalan
+                        # Bakiyeleri Güncelle
+                        ws_bilgi.update_cell(row_idx, 4, hak_edilen)
+                        ws_bilgi.update_cell(row_idx, 5, devir)
+                        ws_bilgi.update_cell(row_idx, 8, yeni_kalan)
 
-                    elif "ŞUA" in izin_tipi:
-                        # Sadece Kullanilan_sua (9. Sütun) artırılır
-                        kul_sua = get_int(9)
-                        ws_bilgi.update_cell(row_idx, 9, kul_sua + gun_sayisi)
+                        # --- YENİ: Bu Yıl Yıllık İzin Toplamı (Sütun 11) ---
+                        if izin_yili == suanki_yil:
+                            bu_yil_yillik = safe_int(row_idx, 11)
+                            ws_bilgi.update_cell(row_idx, 11, bu_yil_yillik + gun_sayisi)
+
+                    # ---------------------------------------------------------
+                    # 2. SENARYO: DİĞER İZİNLER (ŞUA DAHİL)
+                    # ---------------------------------------------------------
+                    else:
+                        # Eğer ŞUA ise ayrıca Şua bakiyesini de işle
+                        if "şua" in izin_tipi or "sua" in izin_tipi:
+                            kul_sua = safe_int(row_idx, 10)
+                            ws_bilgi.update_cell(row_idx, 10, kul_sua + gun_sayisi)
+                        
+                        # --- YENİ: Bu Yıl Diğer İzin Toplamı (Sütun 12) ---
+                        # Yıllık izin dışındaki tüm izinler buraya eklenir
+                        if izin_yili == suanki_yil:
+                            bu_yil_diger = safe_int(row_idx, 12)
+                            ws_bilgi.update_cell(row_idx, 12, bu_yil_diger + gun_sayisi)
 
             self.islem_tamam.emit()
 
         except Exception as e:
             self.hata_olustu.emit(str(e))
+
+# =============================================================================
+# WORKER: SİLME
+# =============================================================================
+class SilWorker(QThread):
+    islem_tamam = Signal()
+    hata_olustu = Signal(str)
+    def __init__(self, kayit_id):
+        super().__init__()
+        self.kid = kayit_id
+    def run(self):
+        try:
+            ws = veritabani_getir('personel', 'izin_giris')
+            cell = ws.find(self.kid)
+            if cell:
+                ws.delete_rows(cell.row)
+                self.islem_tamam.emit()
+            else: self.hata_olustu.emit("Silinecek kayıt bulunamadı.")
+        except Exception as e: self.hata_olustu.emit(str(e))
 
 # =============================================================================
 # ANA FORM
@@ -230,19 +283,15 @@ class IzinGirisPenceresi(QWidget):
         self.txt_id = QLineEdit()
         self.txt_id.setVisible(False)
 
-        # Hizmet Sınıfı
         self.ui['sinif'] = add_combo_box(form_layout, "Hizmet Sınıfı:", items=["Yükleniyor..."])
         self.ui['sinif'].currentIndexChanged.connect(self._on_sinif_changed)
 
-        # Personel Listesi
         self.ui['personel'] = add_combo_box(form_layout, "Personel:", items=[])
         self.ui['personel'].setEditable(True)
         self.ui['personel'].currentIndexChanged.connect(self._on_personel_changed)
 
-        # İzin Tipi
         self.ui['izin_tipi'] = add_combo_box(form_layout, "İzin Tipi:", items=["Yükleniyor..."])
 
-        # Tarih ve Gün
         h_tarih = QHBoxLayout()
         self.ui['baslama'] = QDateEdit()
         self.ui['baslama'].setCalendarPopup(True)
@@ -262,7 +311,6 @@ class IzinGirisPenceresi(QWidget):
         h_tarih.addWidget(self.ui['gun'])
         form_layout.addRow("Başlama Tarihi:", h_tarih)
 
-        # Bitiş Tarihi
         self.ui['bitis'] = QDateEdit()
         self.ui['bitis'].setReadOnly(True)
         self.ui['bitis'].setDisplayFormat("dd.MM.yyyy")
@@ -271,7 +319,6 @@ class IzinGirisPenceresi(QWidget):
         self.ui['bitis'].setFixedHeight(35)
         form_layout.addRow("Bitiş Tarihi:", self.ui['bitis'])
 
-        # Butonlar
         h_btn = QHBoxLayout()
         self.btn_temizle = QPushButton("Yeni Kayıt")
         self.btn_temizle.setFixedHeight(40)
@@ -434,14 +481,13 @@ class IzinGirisPenceresi(QWidget):
                 filtrelenmis_liste.append(row)
         self._genel_tabloyu_doldur(filtrelenmis_liste)
 
-        # Bilgi Paneli Doldurma
         kayit_bulundu = False
         for row in self.tum_bakiye:
             if str(row.get('Kimlik_No', '')).strip() == str(secilen_tc):
-                # Yeni Sütun İsimleri: Hak_Edilen, Devir, ToplamKullanilan, Kalan
                 self.lbl_devir.setText(str(row.get('Devir', '-')))
                 self.lbl_hakedilen.setText(str(row.get('Hak_Edilen', '-')))
-                self.lbl_kullanilan.setText(str(row.get('ToplamKullanilan', '-')))
+                self.lbl_kullanilan.setText(str(row.get('Toplam_Yıllık_İzin', '-')))
+                self.lbl_kullanilan.setText(str(row.get('Kulanilan_Diger_İzinler', '-')))
                 self.lbl_kalan.setText(str(row.get('Kalan', '-')))
                 self.lbl_hak_sua.setText(str(row.get('Hak_Edilen_sua', '-')))
                 self.lbl_kul_sua.setText(str(row.get('Kullanilan_sua', '-')))
@@ -529,6 +575,7 @@ class IzinGirisPenceresi(QWidget):
 
         self.btn_kaydet.setEnabled(False)
         self.progress.setVisible(True); self.progress.setRange(0,0)
+        
         yeni_id = self.txt_id.text() if self.duzenleme_modu else str(uuid.uuid4())[:8]
         
         ad_soyad = self.ui['personel'].currentText().strip()
