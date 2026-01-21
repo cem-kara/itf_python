@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLine
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QPixmap, QIcon
 
+from formlar.sifre_degistir import SifreDegistirPenceresi
+
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
@@ -30,45 +32,40 @@ class GirisWorker(QThread):
 
     def run(self):
         try:
-            # 1. BAĞLANTI: itf_user_vt dosyası, user_login sayfası
-            # NOT: google_baglanti.py dosyanızın bu dosya ismini desteklediğinden emin olun.
-            # Eğer hata alırsanız 'itf_user_vt' yerine spreadsheet ID'si veya tanımlı anahtarı kullanın.
-            ws = veritabani_getir('user', 'user_login') 
-            
+            ws = veritabani_getir('user', 'user_login')
             if not ws:
-                self.sonuc.emit(False, "Veritabanına (itf_user_vt) erişilemedi.", "", "")
+                self.sonuc.emit(False, "Veritabanı hatası.", "", "")
                 return
 
             records = ws.get_all_records()
-            
-            # enumerate ile döngü kuruyoruz ki satır numarasını bilelim (Excel satırı = index + 2)
             for i, user in enumerate(records):
-                # Sütun İsimleri: user_id, username, password, roller, login_date_time
                 vt_kadi = str(user.get('username', '')).strip()
                 vt_sifre = str(user.get('password', '')).strip()
                 
                 if vt_kadi == self.kadi and vt_sifre == self.sifre:
-                    # GİRİŞ BAŞARILI
                     rol = str(user.get('roller', 'user'))
                     
-                    # --- Login Tarihini Güncelleme ---
+                    # --- YENİ: Değişim Gerekli mi Kontrolü ---
+                    # degisim_gerekli sütunu yoksa varsayılan 'HAYIR' kabul et
+                    degisim_gerekli = str(user.get('degisim_gerekli', 'HAYIR')).upper()
+                    
+                    if degisim_gerekli == 'EVET':
+                        # Özel bir sinyal kodu gönderiyoruz: "CHANGE_REQUIRED"
+                        self.sonuc.emit(True, "CHANGE_REQUIRED", vt_kadi, rol)
+                        return
+                    
+                    # Tarih güncelleme
                     try:
-                        # Satır numarası: Liste 0'dan başlar, başlık 1. satırdır -> Veri 2'den başlar.
-                        row_num = i + 2 
-                        simdi = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-                        
-                        # login_date_time 5. sütun olduğu için col=5
-                        ws.update_cell(row_num, 5, simdi)
-                    except Exception as log_err:
-                        print(f"Log yazma hatası: {log_err}")
+                        ws.update_cell(i + 2, 5, datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
+                    except: pass
 
-                    self.sonuc.emit(True, "Giriş Başarılı", vt_kadi, rol)
+                    self.sonuc.emit(True, "OK", vt_kadi, rol)
                     return
             
             self.sonuc.emit(False, "Kullanıcı adı veya şifre hatalı.", "", "")
 
         except Exception as e:
-            self.sonuc.emit(False, f"Sistem Hatası: {str(e)}", "", "")
+            self.sonuc.emit(False, f"Hata: {e}", "", "")
 
 class LoginPenceresi(QWidget):
     def __init__(self):
@@ -176,14 +173,23 @@ class LoginPenceresi(QWidget):
         self.btn_giris.setText("GİRİŞ YAP")
 
         if basarili:
-            # Main Pencereyi Aç
-            try:
-                # İsterseniz yetkiyi AnaPencere'ye gönderebilirsiniz: AnaPencere(yetki=rol)
-                self.main_win = AnaPencere() 
+            if mesaj == "CHANGE_REQUIRED":
+                # Şifre Değiştirme Penceresini Aç
+                self.hide() # Logini gizle
+                dialog = SifreDegistirPenceresi(kadi)
+                if dialog.exec(): # Eğer başarıyla değiştirdiyse
+                    # Ana pencereyi aç
+                    self.main_win = AnaPencere()
+                    self.main_win.show()
+                    self.close()
+                else:
+                    # Vazgeçtiyse logini tekrar göster
+                    self.show()
+            else:
+                # Normal Giriş
+                self.main_win = AnaPencere()
                 self.main_win.show()
                 self.close()
-            except Exception as e:
-                QMessageBox.critical(self, "Hata", f"Ana pencere açılamadı:\n{e}")
         else:
             QMessageBox.critical(self, "Giriş Başarısız", mesaj)
 

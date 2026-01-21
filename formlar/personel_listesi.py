@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit,
     QProgressBar, QFrame, QAbstractItemView, QMessageBox, QComboBox, QCheckBox, QMenu
 )
-
+from PySide6.QtWidgets import QInputDialog
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
@@ -91,6 +91,38 @@ class SabitlerWorker(QThread):
             sirali_liste.insert(0, "Tümü")
             self.veri_indi.emit(sirali_liste)
         except Exception: self.veri_indi.emit(["Tümü"])
+
+class KullaniciEkleWorker(QThread):
+    sonuc = Signal(bool, str)
+    def __init__(self, kimlik, ad_soyad, rol):
+        super().__init__()
+        self.kimlik = kimlik
+        self.ad_soyad = ad_soyad
+        self.rol = rol
+
+    def run(self):
+        try:
+            ws = veritabani_getir('user', 'user_login')
+            if not ws:
+                self.sonuc.emit(False, "User veritabanına erişilemedi.")
+                return
+            
+            # Mükerrer Kontrol
+            records = ws.get_all_records()
+            for r in records:
+                if str(r.get('username')) == str(self.kimlik):
+                    self.sonuc.emit(False, "Bu personel zaten kullanıcı olarak ekli.")
+                    return
+
+            # Ekleme: user_id (rastgele), username (TC), pass (12345), rol, tarih, degisim_gerekli
+            import random
+            user_id = random.randint(10000, 99999)
+            # Sütun sırası: user_id, username, password, roller, login_date_time, degisim_gerekli
+            ws.append_row([user_id, self.kimlik, "12345", self.rol, "", "EVET"])
+            
+            self.sonuc.emit(True, f"{self.ad_soyad} sisteme kullanıcı olarak eklendi.\nŞifre: 12345")
+        except Exception as e:
+            self.sonuc.emit(False, str(e))
 
 # =============================================================================
 # PERSONEL LİSTESİ FORMU
@@ -174,34 +206,64 @@ class PersonelListesiPenceresi(QWidget):
 
     # --- SİNYALLER VE İŞLEMLER ---
     def _sag_tik_menu(self, position):
-        """Tablo üzerinde sağ tıklandığında açılan menü."""
         menu = QMenu()
         menu.setStyleSheet("QMenu { background-color: #2d2d30; color: white; border: 1px solid #555; } QMenu::item:selected { background-color: #0078d4; }")
         
         secili_satir = self.table.currentRow()
         if secili_satir >= 0:
-            item = self.table.item(secili_satir, 0) # TC'yi al
-            data = item.data(Qt.UserRole) # Satır verisini al
+            item = self.table.item(secili_satir, 0) # TC
+            item_ad = self.table.item(secili_satir, 1) # Ad Soyad
             
-            # Durum kontrolü (Son sütun 'Durum' kabul ediliyor)
-            durum = str(data[-1]).strip() if data and len(data) > 0 else "Aktif"
-            
-            action_detay = QAction("📝 Detay Görüntüle", self)
-            action_detay.triggered.connect(lambda: self._detay_ac(secili_satir, 0))
-            menu.addAction(action_detay)
-            
-            menu.addSeparator()
+            if item:
+                tc_no = item.text()
+                ad_soyad = item_ad.text()
+                data = item.data(Qt.UserRole)
+                durum = str(data[-1]).strip() if data and len(data) > 0 else "Aktif"
+                
+                # --- MEVCUT MENÜLER ---
+                action_detay = QAction("📝 Detay Görüntüle", self)
+                action_detay.triggered.connect(lambda: self._detay_ac(secili_satir, 0))
+                menu.addAction(action_detay)
+                
+                menu.addSeparator()
 
-            if durum == "Pasif":
-                action_aktif = QAction("♻️ Aktif Yap (Geri Al)", self)
-                action_aktif.triggered.connect(lambda: self._durum_degistir(data[0], "Aktif"))
-                menu.addAction(action_aktif)
-            else:
-                action_pasif = QAction("🗑️ Arşivle / Pasife Al", self)
-                action_pasif.triggered.connect(lambda: self._durum_degistir(data[0], "Pasif"))
-                menu.addAction(action_pasif)
+                # --- YENİ EKLENEN KISIM: KULLANICI YAP ---
+                action_user = QAction("🔑 Sisteme Kullanıcı Olarak Ekle", self)
+                action_user.triggered.connect(lambda: self._kullanici_yap(tc_no, ad_soyad))
+                menu.addAction(action_user)
+                
+                menu.addSeparator()
+                
+                # ... (Pasif/Aktif kodlarınız burada kalacak) ...
+                if durum == "Pasif":
+                    action_aktif = QAction("♻️ Aktif Yap", self)
+                    action_aktif.triggered.connect(lambda: self._durum_degistir(tc_no, "Aktif"))
+                    menu.addAction(action_aktif)
+                else:
+                    action_pasif = QAction("🗑️ Pasife Al", self)
+                    action_pasif.triggered.connect(lambda: self._durum_degistir(tc_no, "Pasif"))
+                    menu.addAction(action_pasif)
 
         menu.exec(self.table.viewport().mapToGlobal(position))
+
+    def _kullanici_yap(self, tc, ad):
+        """Seçilen personele sistem giriş yetkisi verir."""
+        roller = ["user", "admin", "viewer"]
+        rol, ok = QInputDialog.getItem(self, "Yetki Seçimi", f"{ad} için yetki düzeyi seçiniz:", roller, 0, False)
+        
+        if ok and rol:
+            if show_question("Onay", f"{ad} sisteme '{rol}' yetkisiyle eklenecek.\nVarsayılan Şifre: 12345\nOnaylıyor musunuz?", self):
+                self.progress.setVisible(True)
+                self.user_worker = KullaniciEkleWorker(tc, ad, rol)
+                self.user_worker.sonuc.connect(self._kullanici_ekleme_bitti)
+                self.user_worker.start()
+
+    def _kullanici_ekleme_bitti(self, basari, mesaj):
+        self.progress.setVisible(False)
+        if basari:
+            show_info("İşlem Başarılı", mesaj, self)
+        else:
+            show_error("Hata", mesaj, self)
 
     def _durum_degistir(self, tc, yeni_durum):
         if show_question("Onay", f"Personel durumu '{yeni_durum}' olarak değiştirilecek. Emin misiniz?", self):

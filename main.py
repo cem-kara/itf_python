@@ -45,7 +45,7 @@ FORM_MAP = {
     "Personel Ekle":    ("formlar.personel_ekle", "PersonelEklePenceresi"),
     "İzin Takip":       ("formlar.izin_takip", "IzinGirisPenceresi"),
     "FHSZ Yönetim":     ("formlar.fhsz_Yonetim", "FHSZYonetimPaneli"),
-    #"FHSZ Puantaj":     ("formlar.fhsz_puantaj", "PuantajRaporPenceresi"),
+    "Personel Verileri":     ("formlar.user_dashboard", "DashboardWidget"),
 
     # -- CİHAZ --
     "Cihaz Listesi":    ("formlar.cihaz_listesi", "CihazListesiPenceresi"),
@@ -64,7 +64,7 @@ FORM_MAP = {
 # Akordeon Menü Yapısı (AYNEN KORUNDU)
 MENU_STRUCTURE = {
     "GENEL": ["Dashboard", "User Login", "Ayarlar"],
-    "PERSONEL": ["Personel Listesi", "Personel Ekle", "İzin Takip", "FHSZ Yönetim"],
+    "PERSONEL": ["Personel Listesi", "Personel Ekle", "İzin Takip", "FHSZ Yönetim", "Personel Verileri"],
     "CİHAZ": ["Cihaz Listesi", "Cihaz Ekle", "Ariza Kaydi", "Ariza Listesi", "Periyodik Bakim", "Kalibrasyon Takip"],
     "RKE": ["RKE Listesi", "Muayene Girişi", "RKE Raporlama"]
 }
