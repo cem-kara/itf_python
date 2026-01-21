@@ -358,26 +358,30 @@ class IzinGirisPenceresi(QWidget):
         self.lbl_hakedilen.setStyleSheet(val_style)
         bilgi_layout.addWidget(self.lbl_hakedilen, 1, 1)
 
-        bilgi_layout.addWidget(QLabel("Kullanılan İzin:"), 2, 0)
+        bilgi_layout.addWidget(QLabel("Kullanılan Yıllık İzin:"), 2, 0)
         self.lbl_kullanilan.setStyleSheet(val_style)
         bilgi_layout.addWidget(self.lbl_kullanilan, 2, 1)
 
-        bilgi_layout.addWidget(QLabel("KALAN İZİN:"), 3, 0)
+        bilgi_layout.addWidget(QLabel("Kullanılan Diğer İzin:"), 3, 0)
+        self.lbl_kullanilan.setStyleSheet(val_style)
+        bilgi_layout.addWidget(self.lbl_kullanilan, 3, 1)
+
+        bilgi_layout.addWidget(QLabel("KALAN İZİN:"), 4, 0)
         self.lbl_kalan.setStyleSheet("font-weight: bold; color: #2196f3; font-size: 15px;")
-        bilgi_layout.addWidget(self.lbl_kalan, 3, 1)
+        bilgi_layout.addWidget(self.lbl_kalan, 4, 1)
 
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
-        bilgi_layout.addWidget(line, 4, 0, 1, 2)
+        bilgi_layout.addWidget(line, 5, 0, 1, 2)
 
-        bilgi_layout.addWidget(QLabel("Hak Edilen Şua:"), 5, 0)
+        bilgi_layout.addWidget(QLabel("Hak Edilen Şua:"), 6, 0)
         self.lbl_hak_sua.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_hak_sua, 5, 1)
+        bilgi_layout.addWidget(self.lbl_hak_sua, 6, 1)
         
-        bilgi_layout.addWidget(QLabel("Kullanılan Şua:"), 6, 0)
+        bilgi_layout.addWidget(QLabel("Kullanılan Şua:"), 7, 0)
         self.lbl_kul_sua.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_kul_sua, 6, 1)
+        bilgi_layout.addWidget(self.lbl_kul_sua, 7, 1)
 
         grp_bilgi.setLayout(bilgi_layout)
         left_layout.addWidget(grp_bilgi)
@@ -486,8 +490,8 @@ class IzinGirisPenceresi(QWidget):
             if str(row.get('Kimlik_No', '')).strip() == str(secilen_tc):
                 self.lbl_devir.setText(str(row.get('Devir', '-')))
                 self.lbl_hakedilen.setText(str(row.get('Hak_Edilen', '-')))
-                self.lbl_kullanilan.setText(str(row.get('Toplam_Yıllık_İzin', '-')))
-                self.lbl_kullanilan.setText(str(row.get('Kulanilan_Diger_İzinler', '-')))
+                self.lbl_kullanilan.setText(str(row.get('Toplam', '-')))
+                self.lbl_kullanilan.setText(str(row.get('Kullanilan_Dig_İzin', '-')))
                 self.lbl_kalan.setText(str(row.get('Kalan', '-')))
                 self.lbl_hak_sua.setText(str(row.get('Hak_Edilen_sua', '-')))
                 self.lbl_kul_sua.setText(str(row.get('Kullanilan_sua', '-')))
