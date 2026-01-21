@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLine
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QPixmap, QIcon
 
-from formlar.sifre_degistir import SifreDegistirPenceresi
+
 
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +20,7 @@ try:
     from main import AnaPencere 
 except ImportError:
     pass
-
+from formlar.sifre_degistir import SifreDegistirPenceresi
 class GirisWorker(QThread):
     # Sinyal: Başarılı mı?, Mesaj, Kullanıcı Adı, Rol
     sonuc = Signal(bool, str, str, str)
