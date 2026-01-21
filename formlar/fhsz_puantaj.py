@@ -6,36 +6,30 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QTableWidget, QTableWidgetItem, QHeaderView, 
-                               QPushButton, QLabel, QMessageBox, QComboBox, 
-                               QGroupBox, QFileDialog, QAbstractItemView, QMdiSubWindow, QFrame, QSpacerItem, QSizePolicy)
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QFont, QColor, QPageSize, QTextDocument, QIcon, QPalette, QColor
+                               QPushButton, QLabel, QComboBox, 
+                               QGroupBox, QFileDialog, QAbstractItemView, QFrame, QSizePolicy)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QColor, QPageSize, QTextDocument, QColor
 from PySide6.QtPrintSupport import QPrinter
 
-# --- ANA KLASÖR BAĞLANTISI ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
-# --- İMPORTLAR ---
+# --- MODÜLLER ---
 try:
     from google_baglanti import veritabani_getir
-except ImportError:
+    # Ortak araçlardan gerekli fonksiyonları alıyoruz
+    from araclar.ortak_araclar import pencereyi_kapat, show_info, show_error
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
+    # Hata durumunda dummy fonksiyonlar (Kod çökmemesi için)
     def veritabani_getir(vt_tipi, sayfa_adi): return None
-
-# --- MDI PENCERE KAPATMA YARDIMCISI ---
-def pencereyi_kapat(widget_self):
-    try:
-        parent = widget_self.parent()
-        while parent:
-            if isinstance(parent, QMdiSubWindow):
-                parent.close()
-                return
-            parent = parent.parent()
-        widget_self.close()
-    except:
-        widget_self.close()
+    def pencereyi_kapat(w): w.close()
+    def show_info(t, m, p): print(m)
+    def show_error(t, m, p): print(m)
 
 # --- ŞUA HESAPLAMA MANTIĞI (DEĞİŞTİRİLMEDİ) ---
 def sua_hak_edis_hesapla(toplam_saat):
@@ -82,115 +76,50 @@ class PuantajRaporPenceresi(QWidget):
         self.df_puantaj = pd.DataFrame()
         self.filtrelenmis_df = pd.DataFrame()
         
-        # Modern Stil Tanımlamaları
-        self.apply_styles()
-        
+        # Not: Global stil (tema.py) uygulandığı varsayılıyor.
+        # Sadece bu sayfaya özel yerel stilleri setup_ui içinde tanımlıyoruz.
         self.setup_ui()
-
-    def apply_styles(self):
-        """Uygulama genelinde kullanılacak modern CSS stili."""
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e1e;
-                color: #f0f0f0;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
-            }
-            QGroupBox {
-                background-color: #252526;
-                border: 1px solid #3e3e42;
-                border-radius: 8px;
-                margin-top: 24px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 10px;
-                padding: 0 5px;
-                color: #4dabf7; 
-                font-weight: bold;
-                font-size: 15px;
-            }
-            QComboBox {
-                background-color: #333337;
-                border: 1px solid #454545;
-                border-radius: 4px;
-                padding: 6px;
-                color: white;
-                min-width: 100px;
-            }
-            QComboBox:hover {
-                border: 1px solid #0078d4;
-            }
-            QComboBox::drop-down {
-                border: 0px;
-            }
-            QLabel {
-                color: #cccccc;
-                font-weight: 500;
-            }
-            QTableWidget {
-                background-color: #252526;
-                gridline-color: #3e3e42;
-                border: 1px solid #3e3e42;
-                border-radius: 4px;
-                selection-background-color: #264f78;
-                selection-color: white;
-            }
-            QHeaderView::section {
-                background-color: #333337;
-                color: #e0e0e0;
-                padding: 8px;
-                border: 1px solid #3e3e42;
-                font-weight: bold;
-            }
-            QScrollBar:vertical {
-                background: #1e1e1e;
-                width: 12px;
-            }
-            QScrollBar::handle:vertical {
-                background: #555;
-                min-height: 20px;
-                border-radius: 6px;
-            }
-        """)
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(25, 25, 25, 25)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
         # --- ÜST PANEL (Filtreler ve Aksiyon) ---
         filter_frame = QFrame()
+        # Card Görünümü için özel stil
         filter_frame.setStyleSheet("""
             QFrame {
                 background-color: #2d2d30;
-                border-radius: 10px;
+                border-radius: 8px;
                 border: 1px solid #3e3e42;
+            }
+            QLabel {
+                border: none;
+                background-color: transparent;
             }
         """)
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setContentsMargins(20, 20, 20, 20)
         filter_layout.setSpacing(20)
 
-        # Başlık ve İkon Alanı (Opsiyonel Sol taraf)
+        # Başlık
         lbl_title = QLabel("RAPOR FİLTRELERİ")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4dabf7; border: none;")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4dabf7;")
         filter_layout.addWidget(lbl_title)
 
-        # Dikey Ayırıcı
+        # Ayırıcı
         line = QFrame()
         line.setFrameShape(QFrame.VLine)
         line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("border: none; background-color: #3e3e42; max-width: 1px;")
+        line.setStyleSheet("border: none; background-color: #555; max-width: 1px;")
         filter_layout.addWidget(line)
 
         # Yıl Seçimi
         vbox_yil = QVBoxLayout()
         vbox_yil.setSpacing(5)
         lbl_yil = QLabel("Rapor Yılı")
-        lbl_yil.setStyleSheet("border:none; font-size: 12px; color: #aaa;")
+        lbl_yil.setStyleSheet("color: #aaa; font-size: 12px;")
         
         self.cmb_yil = QComboBox()
         bu_yil = datetime.now().year
@@ -206,7 +135,7 @@ class PuantajRaporPenceresi(QWidget):
         vbox_donem = QVBoxLayout()
         vbox_donem.setSpacing(5)
         lbl_donem = QLabel("Dönem / Ay")
-        lbl_donem.setStyleSheet("border:none; font-size: 12px; color: #aaa;")
+        lbl_donem.setStyleSheet("color: #aaa; font-size: 12px;")
 
         self.cmb_donem = QComboBox()
         self.cmb_donem.addItems(["TÜM YIL", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", 
@@ -223,18 +152,16 @@ class PuantajRaporPenceresi(QWidget):
         self.btn_getir = QPushButton(" Raporu Oluştur")
         self.btn_getir.setCursor(Qt.PointingHandCursor)
         self.btn_getir.setMinimumHeight(40)
+        # Özel Buton Stili (Tema dışında özelleştirme)
         self.btn_getir.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
                 color: white;
                 font-weight: bold;
-                padding: 0 25px;
+                padding: 0 20px;
                 border-radius: 6px;
-                border: none;
-                font-size: 14px;
             }
             QPushButton:hover { background-color: #106ebe; }
-            QPushButton:pressed { background-color: #005a9e; }
         """)
         self.btn_getir.clicked.connect(self.verileri_getir_ve_filtrele)
         filter_layout.addWidget(self.btn_getir)
@@ -243,10 +170,9 @@ class PuantajRaporPenceresi(QWidget):
 
         # --- ORTA PANEL (Tablo ve Bilgi) ---
         
-        # Bilgi Label
         self.lbl_bilgi = QLabel("Veri bekleniyor...")
         self.lbl_bilgi.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.lbl_bilgi.setStyleSheet("color: #888; font-style: italic; font-size: 12px; margin-right: 5px;")
+        self.lbl_bilgi.setStyleSheet("color: #888; font-style: italic; font-size: 12px;")
         main_layout.addWidget(self.lbl_bilgi)
 
         # Tablo
@@ -258,7 +184,6 @@ class PuantajRaporPenceresi(QWidget):
         self.tablo.verticalHeader().setVisible(False)
         self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tablo.setAlternatingRowColors(True)
-        # Satır yüksekliği biraz artırıldı
         self.tablo.verticalHeader().setDefaultSectionSize(35)
         
         main_layout.addWidget(self.tablo)
@@ -267,19 +192,10 @@ class PuantajRaporPenceresi(QWidget):
         bottom_layout = QHBoxLayout()
         bottom_layout.setContentsMargins(0, 10, 0, 0)
 
-        # Kapat Butonu (Sol taraf)
+        # Kapat Butonu (Ortak Araçlardan)
         btn_kapat = QPushButton(" Çıkış")
         btn_kapat.setFixedSize(100, 45)
-        btn_kapat.setCursor(Qt.PointingHandCursor)
-        btn_kapat.setStyleSheet("""
-            QPushButton {
-                background-color: #3e3e42;
-                border: 1px solid #555;
-                color: #ccc;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #505055; color: white; }
-        """)
+        btn_kapat.setStyleSheet("background-color: #3e3e42; color: #ccc; border: 1px solid #555; border-radius:6px;")
         btn_kapat.clicked.connect(lambda: pencereyi_kapat(self))
         bottom_layout.addWidget(btn_kapat)
 
@@ -288,14 +204,12 @@ class PuantajRaporPenceresi(QWidget):
         # Excel Butonu
         btn_excel = QPushButton(" Excel İndir")
         btn_excel.setFixedSize(140, 45)
-        btn_excel.setCursor(Qt.PointingHandCursor)
         btn_excel.setStyleSheet("""
             QPushButton {
                 background-color: #107c10;
                 color: white;
                 font-weight: bold;
                 border-radius: 6px;
-                border: none;
             }
             QPushButton:hover { background-color: #0b5a0b; }
         """)
@@ -305,14 +219,12 @@ class PuantajRaporPenceresi(QWidget):
         # PDF Butonu
         btn_pdf = QPushButton(" PDF İndir")
         btn_pdf.setFixedSize(140, 45)
-        btn_pdf.setCursor(Qt.PointingHandCursor)
         btn_pdf.setStyleSheet("""
             QPushButton {
                 background-color: #d13438;
                 color: white;
                 font-weight: bold;
                 border-radius: 6px;
-                border: none;
             }
             QPushButton:hover { background-color: #a4262c; }
         """)
@@ -321,7 +233,7 @@ class PuantajRaporPenceresi(QWidget):
 
         main_layout.addLayout(bottom_layout)
 
-    # --- (AŞAĞIDAKİ FONKSİYONLAR ORİJİNAL MANTIK İLE AYNIDIR) ---
+    # --- FONKSİYONLAR ---
 
     def verileri_getir_ve_filtrele(self):
         self.setCursor(Qt.WaitCursor)
@@ -331,18 +243,14 @@ class PuantajRaporPenceresi(QWidget):
         QApplication.processEvents()
 
         try:
-            # 1. Veri Çekme
             ws = veritabani_getir('personel', 'FHSZ_Puantaj') 
             if not ws:
                 raise Exception("'FHSZ_Puantaj' sayfasına ulaşılamadı.")
 
             data = ws.get_all_records()
             self.df_puantaj = pd.DataFrame(data)
-
-            # Sütun Temizliği
             self.df_puantaj.columns = [c.strip() for c in self.df_puantaj.columns]
 
-            # Yıl bilgisini ComboBox'tan al
             secilen_yil = self.cmb_yil.currentText()
             secilen_donem = self.cmb_donem.currentText()
 
@@ -355,32 +263,23 @@ class PuantajRaporPenceresi(QWidget):
             col_aylik_gun = 'Aylik_Gun' if 'Aylik_Gun' in self.df_puantaj.columns else 'Aylık Gün'
             col_izin = 'Kullanilan_izin' if 'Kullanilan_izin' in self.df_puantaj.columns else 'Kullanılan İzin'
 
-            # Önce Yılı Filtrele
             df_temp = self.df_puantaj[self.df_puantaj[col_yil].astype(str) == secilen_yil].copy()
             
             if df_temp.empty:
                 self.filtrelenmis_df = pd.DataFrame()
                 self.lbl_bilgi.setText("⚠️ Seçilen yıla ait veri bulunamadı.")
-                QMessageBox.warning(self, "Bilgi", "Seçilen yıl için veri bulunamadı.")
+                show_info("Bilgi", "Seçilen yıl için veri bulunamadı.", self)
                 return
 
-            # Saatleri Sayıya Çevir
+            # Sayısal Dönüşümler
             df_temp[col_saat] = pd.to_numeric(df_temp[col_saat].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-            
-            # Diğer sayısal sütunları da çevir
             if col_aylik_gun in df_temp.columns:
                  df_temp[col_aylik_gun] = pd.to_numeric(df_temp[col_aylik_gun].astype(str), errors='coerce').fillna(0)
-            else:
-                 df_temp[col_aylik_gun] = 0
-
             if col_izin in df_temp.columns:
                  df_temp[col_izin] = pd.to_numeric(df_temp[col_izin].astype(str), errors='coerce').fillna(0)
-            else:
-                 df_temp[col_izin] = 0
 
-            # --- SENARYO 1: TÜM YIL (ÖZET TABLO) ---
+            # --- SENARYO 1: TÜM YIL ---
             if secilen_donem == "TÜM YIL":
-                # Personel bazında GRUPLA ve TOPLA
                 grouped_df = df_temp.groupby(['personel_id', col_ad], as_index=False).agg({
                     col_saat: 'sum',      
                     col_aylik_gun: 'sum', 
@@ -389,14 +288,13 @@ class PuantajRaporPenceresi(QWidget):
                 
                 grouped_df[col_yil] = secilen_yil
                 grouped_df[col_donem_db] = "YILLIK TOPLAM"
-                
                 grouped_df['Kumulatif_Saat'] = grouped_df[col_saat] 
                 grouped_df['Toplam_Hak_Edilen_Sua'] = grouped_df['Kumulatif_Saat'].apply(sua_hak_edis_hesapla)
                 
                 self.filtrelenmis_df = grouped_df
                 self.lbl_bilgi.setText(f"✓ {secilen_yil} Yılı Toplamları ({len(self.filtrelenmis_df)} personel)")
 
-            # --- SENARYO 2: BELİRLİ AY (KÜMÜLATİF DETAY) ---
+            # --- SENARYO 2: BELİRLİ AY ---
             else:
                 aylar_sirasi = {
                     "Ocak": 1, "Şubat": 2, "Mart": 3, "Nisan": 4, "Mayıs": 5, "Haziran": 6,
@@ -416,7 +314,7 @@ class PuantajRaporPenceresi(QWidget):
             self.tabloyu_doldur()
 
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Veri işleme hatası:\n{e}")
+            show_error("Hata", f"Veri işleme hatası:\n{e}", self)
             self.lbl_bilgi.setText("❌ Hata oluştu.")
         finally:
             self.setCursor(Qt.ArrowCursor)
@@ -446,14 +344,10 @@ class PuantajRaporPenceresi(QWidget):
             for col, db_col in enumerate(gosterilecek_sutunlar):
                 val = row.get(db_col, '')
                 
-                # --- FORMATLAMA KISMI ---
                 if db_col in [col_saat, 'Kumulatif_Saat']:
                     try:
                         num_val = float(val)
-                        if num_val.is_integer(): 
-                            val = f"{int(num_val)}" 
-                        else:
-                            val = f"{num_val:.1f}" 
+                        val = f"{int(num_val)}" if num_val.is_integer() else f"{num_val:.1f}"
                     except:
                         val = str(val)
                 else:
@@ -463,19 +357,18 @@ class PuantajRaporPenceresi(QWidget):
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignCenter)
                 
-                # Özel Renklendirme
                 if col == 7: # Kümülatif Saat
-                    item.setForeground(QColor("#4dabf7")) # Mavi
+                    item.setForeground(QColor("#4dabf7")) 
                     item.setFont(QFont("Segoe UI", 10, QFont.Bold))
                 elif col == 8: # Hak Edilen Şua
-                    item.setForeground(QColor("#57e389")) # Yeşil
+                    item.setForeground(QColor("#57e389")) 
                     item.setFont(QFont("Segoe UI", 10, QFont.Bold))
                 
                 self.tablo.setItem(idx, col, item)
 
     def excel_indir(self):
         if self.filtrelenmis_df.empty:
-            QMessageBox.warning(self, "Uyarı", "İndirilecek veri yok.")
+            show_info("Uyarı", "İndirilecek veri yok.", self)
             return
 
         secilen_yil = self.cmb_yil.currentText()
@@ -504,13 +397,13 @@ class PuantajRaporPenceresi(QWidget):
                 export_df = export_df[cols_to_export]
 
                 export_df.to_excel(dosya_yolu, index=False)
-                QMessageBox.information(self, "Başarılı", "Excel dosyası başarıyla oluşturuldu.")
+                show_info("Başarılı", "Excel dosyası başarıyla oluşturuldu.", self)
             except Exception as e:
-                QMessageBox.critical(self, "Hata", f"Dosya kaydedilemedi:\n{e}")
+                show_error("Hata", f"Dosya kaydedilemedi:\n{e}", self)
 
     def pdf_indir(self):
         if self.filtrelenmis_df.empty:
-            QMessageBox.warning(self, "Uyarı", "İndirilecek veri yok.")
+            show_info("Uyarı", "İndirilecek veri yok.", self)
             return
 
         secilen_yil = self.cmb_yil.currentText()
@@ -569,13 +462,24 @@ class PuantajRaporPenceresi(QWidget):
                 printer.setPageSize(QPageSize(QPageSize.A4))
                 
                 document.print_(printer)
-                QMessageBox.information(self, "Başarılı", "PDF dosyası başarıyla oluşturuldu.")
+                show_info("Başarılı", "PDF dosyası başarıyla oluşturuldu.", self)
             
             except Exception as e:
-                QMessageBox.critical(self, "Hata", f"PDF hatası:\n{e}")
+                show_error("Hata", f"PDF hatası:\n{e}", self)
 
 if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    # TemaYonetimi entegrasyonu (Test için)
+    # Gerçek uygulamada main.py üzerinden çağrılır.
+    try:
+        from temalar.tema import TemaYonetimi
+    except:
+        pass
+        
     app = QApplication(sys.argv)
+    # Eğer test ediyorsanız aşağıdaki satırı açabilirsiniz:
+    # if 'TemaYonetimi' in locals(): TemaYonetimi.uygula_fusion_dark(app)
+    
     window = PuantajRaporPenceresi()
     window.show()
     sys.exit(app.exec())

@@ -8,49 +8,39 @@ from dateutil.relativedelta import relativedelta
 
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, 
                                QTableWidgetItem, QHeaderView, QPushButton, QLabel, 
-                               QMessageBox, QComboBox, QGroupBox, QProgressBar,
-                               QFrame, QAbstractItemView, QSpinBox, QMdiSubWindow, QSizePolicy)
+                               QComboBox, QGroupBox, QProgressBar,
+                               QFrame, QAbstractItemView, QSpinBox, QSizePolicy)
 from PySide6.QtCore import Qt, QDate, QCoreApplication
 from PySide6.QtGui import QFont, QColor, QIcon
 
-# --- ANA KLASÖR BAĞLANTISI ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
-# --- İMPORTLAR ---
+# --- MODÜLLER ---
 try:
     from google_baglanti import veritabani_getir
-except ImportError:
+    from araclar.ortak_araclar import pencereyi_kapat, show_info, show_error
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
     def veritabani_getir(vt_tipi, sayfa_adi): return None
+    def pencereyi_kapat(w): w.close()
+    def show_info(t, m, p): print(m)
+    def show_error(t, m, p): print(m)
 
-# --- MDI PENCERE KAPATMA YARDIMCISI ---
-def pencereyi_kapat(widget_self):
-    try:
-        parent = widget_self.parent()
-        while parent:
-            if isinstance(parent, QMdiSubWindow):
-                parent.close()
-                return
-            parent = parent.parent()
-        widget_self.close()
-    except:
-        widget_self.close()
-
-# --- TÜRKÇE KARAKTER DESTEKLİ BÜYÜTME ---
+# --- YARDIMCI FONKSİYONLAR ---
 def tr_upper(text):
-    if not isinstance(text, str):
-        return str(text).upper()
+    if not isinstance(text, str): return str(text).upper()
     return text.replace('i', 'İ').replace('ı', 'I').replace('ğ', 'Ğ').replace('ü', 'Ü').replace('ş', 'Ş').replace('ö', 'Ö').replace('ç', 'Ç').upper()
 
-# --- ŞUA HESAPLAMA MANTIĞI (DEĞİŞTİRİLMEDİ) ---
 def sua_hak_edis_hesapla(toplam_saat):
     try:
         saat = float(toplam_saat)
     except:
         return 0
-
+    # Mevcut mantık aynen korunmuştur
     if saat < 50: return 1
     elif 51 <= saat < 100: return 2
     elif 101 <= saat < 150: return 3
@@ -92,93 +82,27 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.tatil_listesi_np = []
         self.birim_kosul_map = {} 
         
-        # Modern Stil Uygulaması
-        self.apply_styles()
-        
+        # UI Kurulumu
         self.setup_ui()
         self.verileri_yukle()
 
-    def apply_styles(self):
-        """Uygulama genelinde kullanılacak modern CSS stili."""
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e1e;
-                color: #f0f0f0;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
-            }
-            QGroupBox {
-                background-color: #252526;
-                border: 1px solid #3e3e42;
-                border-radius: 8px;
-                margin-top: 24px;
-                padding-top: 15px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 10px;
-                padding: 0 5px;
-                color: #4dabf7; 
-                font-weight: bold;
-                font-size: 15px;
-            }
-            QComboBox {
-                background-color: #333337;
-                border: 1px solid #454545;
-                border-radius: 4px;
-                padding: 6px;
-                color: white;
-                min-width: 100px;
-            }
-            QComboBox:hover {
-                border: 1px solid #0078d4;
-            }
-            QComboBox::drop-down {
-                border: 0px;
-            }
-            QLabel {
-                color: #cccccc;
-                font-weight: 500;
-            }
-            QTableWidget {
-                background-color: #252526;
-                gridline-color: #3e3e42;
-                border: 1px solid #3e3e42;
-                border-radius: 4px;
-                selection-background-color: #264f78;
-                selection-color: white;
-            }
-            QHeaderView::section {
-                background-color: #333337;
-                color: #e0e0e0;
-                padding: 8px;
-                border: 1px solid #3e3e42;
-                font-weight: bold;
-            }
-            QScrollBar:vertical {
-                background: #1e1e1e;
-                width: 12px;
-            }
-            QScrollBar::handle:vertical {
-                background: #555;
-                min-height: 20px;
-                border-radius: 6px;
-            }
-        """)
-
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(25, 25, 25, 25)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
         # --- 1. ÜST PANEL (DÖNEM SEÇİMİ) ---
         filter_frame = QFrame()
+        # Card görünümü
         filter_frame.setStyleSheet("""
             QFrame {
                 background-color: #2d2d30;
-                border-radius: 10px;
+                border-radius: 8px;
                 border: 1px solid #3e3e42;
+            }
+            QLabel {
+                border: none;
+                background-color: transparent;
             }
         """)
         filter_layout = QHBoxLayout(filter_frame)
@@ -187,21 +111,20 @@ class FHSZHesaplamaPenceresi(QWidget):
 
         # Başlık
         lbl_title = QLabel("HESAPLAMA DÖNEMİ")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4dabf7; border: none;")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4dabf7;")
         filter_layout.addWidget(lbl_title)
 
-        # Dikey Ayırıcı
         line = QFrame()
         line.setFrameShape(QFrame.VLine)
         line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("border: none; background-color: #3e3e42; max-width: 1px;")
+        line.setStyleSheet("border: none; background-color: #555; max-width: 1px;")
         filter_layout.addWidget(line)
 
-        # Yıl Seçimi
+        # Yıl
         vbox_yil = QVBoxLayout()
         vbox_yil.setSpacing(5)
         lbl_yil = QLabel("Yıl (Ait_yil)")
-        lbl_yil.setStyleSheet("border:none; font-size: 12px; color: #aaa;")
+        lbl_yil.setStyleSheet("color: #aaa; font-size: 12px;")
         
         self.cmb_yil = QComboBox()
         bu_yil = datetime.now().year
@@ -213,11 +136,11 @@ class FHSZHesaplamaPenceresi(QWidget):
         vbox_yil.addWidget(self.cmb_yil)
         filter_layout.addLayout(vbox_yil)
 
-        # Ay Seçimi
+        # Ay
         vbox_ay = QVBoxLayout()
         vbox_ay.setSpacing(5)
         lbl_ay = QLabel("Dönem (Ay)")
-        lbl_ay.setStyleSheet("border:none; font-size: 12px; color: #aaa;")
+        lbl_ay.setStyleSheet("color: #aaa; font-size: 12px;")
 
         self.cmb_ay = QComboBox()
         self.aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", 
@@ -232,7 +155,7 @@ class FHSZHesaplamaPenceresi(QWidget):
 
         # Bilgi Etiketi
         self.lbl_donem_bilgi = QLabel("Seçili Dönem: ...")
-        self.lbl_donem_bilgi.setStyleSheet("color: #ffb74d; font-weight: bold; border:none; margin-left: 10px;")
+        self.lbl_donem_bilgi.setStyleSheet("color: #ffb74d; font-weight: bold; margin-left: 10px;")
         filter_layout.addWidget(self.lbl_donem_bilgi)
         
         filter_layout.addStretch()
@@ -248,11 +171,8 @@ class FHSZHesaplamaPenceresi(QWidget):
                 font-weight: bold;
                 padding: 0 20px;
                 border-radius: 6px;
-                border: none;
-                font-size: 14px;
             }
             QPushButton:hover { background-color: #106ebe; }
-            QPushButton:pressed { background-color: #005a9e; }
         """)
         self.btn_hesapla.clicked.connect(self.tabloyu_olustur_ve_hesapla)
         filter_layout.addWidget(self.btn_hesapla)
@@ -269,8 +189,8 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.tablo.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         self.tablo.setColumnWidth(3, 250) 
         self.tablo.setAlternatingRowColors(True)
-        self.tablo.verticalHeader().setDefaultSectionSize(40) # Satır yüksekliği
-        self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers) # Elle düzenlemeyi kapat (Sadece Combo çalışsın)
+        self.tablo.verticalHeader().setDefaultSectionSize(40)
+        self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
         
         main_layout.addWidget(self.tablo)
 
@@ -287,32 +207,19 @@ class FHSZHesaplamaPenceresi(QWidget):
         # Kapat Butonu
         self.btn_kapat = QPushButton(" İptal")
         self.btn_kapat.setFixedSize(120, 45)
-        self.btn_kapat.setCursor(Qt.PointingHandCursor)
-        self.btn_kapat.setStyleSheet("""
-            QPushButton {
-                background-color: #3e3e42;
-                border: 1px solid #555;
-                color: #ccc;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #505055; color: white; }
-        """)
+        self.btn_kapat.setStyleSheet("background-color: #3e3e42; color: #ccc; border: 1px solid #555; border-radius:6px; font-weight: bold;")
         self.btn_kapat.clicked.connect(lambda: pencereyi_kapat(self))
         bottom_layout.addWidget(self.btn_kapat)
 
         # Kaydet Butonu
         self.btn_kaydet = QPushButton(" VERİTABANINA KAYDET")
         self.btn_kaydet.setFixedSize(250, 45)
-        self.btn_kaydet.setCursor(Qt.PointingHandCursor)
         self.btn_kaydet.setStyleSheet("""
             QPushButton {
                 background-color: #107c10;
                 color: white;
                 font-weight: bold;
                 border-radius: 6px;
-                border: none;
-                font-size: 14px;
             }
             QPushButton:hover { background-color: #0b5a0b; }
         """)
@@ -337,9 +244,7 @@ class FHSZHesaplamaPenceresi(QWidget):
             pass
 
     def verileri_yukle(self):
-        """Verileri çeker. (MANTIK DEĞİŞMEDİ)"""
         try:
-            # 1. Personel
             ws_p = veritabani_getir('personel', 'Personel')
             if ws_p:
                 self.df_personel = pd.DataFrame(ws_p.get_all_records())
@@ -347,11 +252,9 @@ class FHSZHesaplamaPenceresi(QWidget):
                     self.df_personel['Kimlik_No'] = self.df_personel['Kimlik_No'].astype(str).apply(
                         lambda x: x.split('.')[0] if x else "0"
                     )
-                # Görev Yeri temizliği
                 if 'Gorev_Yeri' in self.df_personel.columns:
                     self.df_personel['Gorev_Yeri'] = self.df_personel['Gorev_Yeri'].fillna("").astype(str)
 
-            # 2. İzinler
             ws_i = veritabani_getir('personel', 'izin_giris')
             if ws_i:
                 self.df_izin = pd.DataFrame(ws_i.get_all_records())
@@ -364,7 +267,6 @@ class FHSZHesaplamaPenceresi(QWidget):
                         if col in self.df_izin.columns:
                             self.df_izin[col] = pd.to_datetime(self.df_izin[col], dayfirst=True, errors='coerce')
 
-            # 3. Tatiller
             ws_tatil = veritabani_getir('sabit', 'Tatiller') 
             self.tatil_listesi_np = []
             if ws_tatil:
@@ -373,7 +275,6 @@ class FHSZHesaplamaPenceresi(QWidget):
                     tatiller = pd.to_datetime(df_t['Tarih'], dayfirst=True, errors='coerce')
                     self.tatil_listesi_np = tatiller.dropna().dt.strftime('%Y-%m-%d').tolist()
             
-            # 4. FHSZ_Kriter (menuEleman ve Aciklama)
             self.birim_kosul_map = {}
             ws_kriter = veritabani_getir('sabit', 'FHSZ_Kriter') 
             
@@ -382,13 +283,11 @@ class FHSZHesaplamaPenceresi(QWidget):
                 if not df_k.empty:
                     df_k.columns = df_k.columns.str.strip()
                     
-                    # Sütun İsim Kontrolü (Büyük/Küçük Harf)
                     col_menu = 'menuEleman' if 'menuEleman' in df_k.columns else 'MenuEleman'
                     col_acik = 'Aciklama' if 'Aciklama' in df_k.columns else 'aciklama'
                     
                     if col_menu in df_k.columns and col_acik in df_k.columns:
                         for _, row in df_k.iterrows():
-                            # Anahtar: Birebir eşleşme için büyük harf
                             anahtar = tr_upper(str(row[col_menu]).strip())
                             deger = tr_upper(str(row[col_acik]).strip())
                             
@@ -402,10 +301,9 @@ class FHSZHesaplamaPenceresi(QWidget):
                                 self.birim_kosul_map[anahtar] = kosul
 
         except Exception as e:
-            QMessageBox.warning(self, "Veri Hatası", f"Veriler çekilemedi: {e}")
+            show_error("Veri Hatası", f"Veriler çekilemedi: {e}", self)
 
     def is_gunu_hesapla(self, baslangic, bitis):
-        """Tatilleri ve hafta sonlarını düşerek iş günü sayar."""
         try:
             dates_start = baslangic.strftime('%Y-%m-%d')
             dates_end = (bitis + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -415,7 +313,6 @@ class FHSZHesaplamaPenceresi(QWidget):
             return 0
 
     def kesisim_izin_gunu_hesapla(self, kimlik_no, donem_bas, donem_bit):
-        """Personelin dönemle çakışan izin günlerini hesaplar."""
         if self.df_izin.empty: return 0
         if 'personel_id' not in self.df_izin.columns: return 0
         
@@ -451,7 +348,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         standart_is_gunu = self.is_gunu_hesapla(donem_bas, donem_bit)
         
         if self.df_personel.empty:
-            QMessageBox.warning(self, "Hata", "Personel listesi boş.")
+            show_info("Hata", "Personel listesi boş.", self)
             return
 
         sorted_df = self.df_personel.sort_values(by="Ad_Soyad")
@@ -462,19 +359,15 @@ class FHSZHesaplamaPenceresi(QWidget):
             
             kimlik = str(row.get('Kimlik_No', '')).strip()
             ad = row.get('Ad_Soyad', '')
-            
-            # Personelin Görev Yeri (Veritabanındaki orijinal hali)
             personel_gorev_yeri = str(row.get('Gorev_Yeri', '')).strip()
             
-            # 1. Kimlik, Ad, Birim
             self.tablo.setItem(row_idx, 0, QTableWidgetItem(kimlik))
             self.tablo.setItem(row_idx, 1, QTableWidgetItem(ad))
             self.tablo.setItem(row_idx, 2, QTableWidgetItem(personel_gorev_yeri))
             
-            # 2. Çalışma Koşulu - BİREBİR EŞLEŞTİRME
             cmb_kosul = QComboBox()
             cmb_kosul.addItems(["Çalışma Koşulu A", "Çalışma Koşulu B"])
-            # Combobox Stili
+            # Combo stili
             cmb_kosul.setStyleSheet("background-color: #333337; color: white; border: 1px solid #555; border-radius: 4px;")
             
             varsayilan_kosul = "B"
@@ -484,21 +377,18 @@ class FHSZHesaplamaPenceresi(QWidget):
                 varsayilan_kosul = self.birim_kosul_map[personel_gorev_key]
             
             if varsayilan_kosul == "A":
-                cmb_kosul.setCurrentIndex(0) # A
+                cmb_kosul.setCurrentIndex(0) 
             else:
-                cmb_kosul.setCurrentIndex(1) # B
+                cmb_kosul.setCurrentIndex(1) 
                 
             cmb_kosul.currentIndexChanged.connect(lambda index, r=row_idx: self.satir_hesapla(r, standart_is_gunu))
             self.tablo.setCellWidget(row_idx, 3, cmb_kosul)
             
-            # 3. Aylık Gün
             self.tablo.setItem(row_idx, 4, QTableWidgetItem(str(standart_is_gunu)))
             
-            # 4. Kullanılan İzin
             izin_gunu = self.kesisim_izin_gunu_hesapla(kimlik, donem_bas, donem_bit)
             self.tablo.setItem(row_idx, 5, QTableWidgetItem(str(izin_gunu)))
             
-            # 5. Fiili Çalışma
             self.satir_hesapla(row_idx, standart_is_gunu)
 
     def satir_hesapla(self, row_idx, standart_is_gunu):
@@ -508,7 +398,6 @@ class FHSZHesaplamaPenceresi(QWidget):
         except:
             izin_gunu = 0
         
-        # HESAPLAMA MANTIĞI
         secili_metin = cmb.currentText()
         
         puan = 0
@@ -521,19 +410,19 @@ class FHSZHesaplamaPenceresi(QWidget):
         item = QTableWidgetItem(str(puan))
         item.setTextAlignment(Qt.AlignCenter)
         item.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        # Koyu temada metin rengi
+        # Text Rengi: Dark mode'da siyah arka planlı label zor okunabilir, 
+        # burada hücre arkaplanı renkli olduğu için siyah text uygundur.
         item.setForeground(QColor("black"))
         
-        if puan > 0: item.setBackground(QColor("#81c784")) # Yeşil
-        else: item.setBackground(QColor("#e57373")) # Kırmızı
+        if puan > 0: item.setBackground(QColor("#81c784")) 
+        else: item.setBackground(QColor("#e57373")) 
         
         self.tablo.setItem(row_idx, 6, item)
 
     def kaydet(self):
-        """FHSZ_Puantaj sayfasına istenen formatta kaydeder."""
         ws = veritabani_getir('personel', 'FHSZ_Puantaj')
         if not ws:
-            QMessageBox.critical(self, "Hata", "FHSZ_Puantaj sayfasına erişilemedi.")
+            show_error("Hata", "FHSZ_Puantaj sayfasına erişilemedi.", self)
             return
             
         ait_yil = self.cmb_yil.currentText()
@@ -567,27 +456,21 @@ class FHSZHesaplamaPenceresi(QWidget):
             self.lbl_donem_bilgi.setText("Puantaj kaydedildi, Şua hak edişleri güncelleniyor...")
             QCoreApplication.processEvents() 
             
-            # İzin tablosunu güncelle
             self.izin_bilgi_guncelle(ait_yil)
 
-            QMessageBox.information(self, "Başarılı", f"{len(veriler)} kayıt başarıyla eklendi ve şua hakları güncellendi.")    
+            show_info("Başarılı", f"{len(veriler)} kayıt başarıyla eklendi ve şua hakları güncellendi.", self)    
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Kaydetme hatası: {e}")
+            show_error("Hata", f"Kaydetme hatası: {e}", self)
         finally:
             self.btn_kaydet.setText(" VERİTABANINA KAYDET")
             self.btn_kaydet.setEnabled(True)
             QApplication.restoreOverrideCursor()
 
     def izin_bilgi_guncelle(self, ait_yil):
-        """
-        FHSZ_Puantaj verilerini okur, hesaplar ve izin_bilgi sayfasındaki 
-        'Hak_Edilen_sua' sütununu TEK SEFERDE (Batch) günceller.
-        """
         print(f"\n--- TOPLU GÜNCELLEME İŞLEMİ BAŞLADI ({ait_yil}) ---")
         try:
             from gspread.cell import Cell
 
-            # 1. BAĞLANTI
             ws_puantaj = veritabani_getir('personel', 'FHSZ_Puantaj')
             ws_izin = veritabani_getir('personel', 'izin_bilgi')
             
@@ -595,7 +478,6 @@ class FHSZHesaplamaPenceresi(QWidget):
                 print("HATA: Veritabanı sayfalarına bağlanılamadı.")
                 return
 
-            # 2. PUANTAJ VERİSİNİ AL VE HESAPLA
             df_puantaj = pd.DataFrame(ws_puantaj.get_all_records())
             
             if df_puantaj.empty:
@@ -622,7 +504,6 @@ class FHSZHesaplamaPenceresi(QWidget):
             kisi_toplamlari = df_yil.groupby('clean_id')[col_saat].sum().to_dict()
             print(f"-> {len(kisi_toplamlari)} personelin saati hesaplandı.")
 
-            # 3. İZİN BİLGİ VERİLERİNİ HAZIRLA
             all_values = ws_izin.get_all_values()
             basliklar = [str(x).strip() for x in all_values[0]]
             
@@ -630,7 +511,7 @@ class FHSZHesaplamaPenceresi(QWidget):
             kimlik_col = "Kimlik_No"
 
             if target_col not in basliklar:
-                QMessageBox.warning(self, "Hata", f"'{target_col}' sütunu bulunamadı.")
+                show_error("Hata", f"'{target_col}' sütunu bulunamadı.", self)
                 return
             
             if kimlik_col not in basliklar:
@@ -657,7 +538,6 @@ class FHSZHesaplamaPenceresi(QWidget):
                     if str(mevcut_deger) != str(hak_edilen_gun):
                         batch_updates.append(Cell(row=i, col=gspread_col_index, value=hak_edilen_gun))
 
-            # 4. TOPLU GÖNDERİM
             if batch_updates:
                 print(f"-> {len(batch_updates)} kayıt güncelleniyor... (Lütfen bekleyin)")
                 ws_izin.update_cells(batch_updates)
@@ -669,12 +549,16 @@ class FHSZHesaplamaPenceresi(QWidget):
             print(f"BEKLENMEDİK HATA: {e}")
             import traceback
             traceback.print_exc()
-            QMessageBox.critical(self, "Hata", f"Güncelleme sırasında hata oluştu:\n{e}")
+            show_error("Hata", f"Güncelleme sırasında hata oluştu:\n{e}", self)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # Test için Fusion stili
-    app.setStyle("Fusion")
+    # TemaYonetimi entegrasyonu (Test için)
+    try:
+        from temalar.tema import TemaYonetimi
+        TemaYonetimi.uygula_fusion_dark(app)
+    except:
+        pass
     w = FHSZHesaplamaPenceresi()
     w.show()
     sys.exit(app.exec())

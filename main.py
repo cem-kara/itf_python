@@ -45,7 +45,7 @@ FORM_MAP = {
     "Personel Ekle":    ("formlar.personel_ekle", "PersonelEklePenceresi"),
     "İzin Takip":       ("formlar.izin_takip", "IzinGirisPenceresi"),
     "FHSZ Hesapla":     ("formlar.fhsz_hesapla", "FHSZHesaplamaPenceresi"),
-    "FHSZ Puantaj":     ("formlar.FHSZ_Puantaj", "PuantajRaporPenceresi"),
+    "FHSZ Puantaj":     ("formlar.fhsz_puantaj", "PuantajRaporPenceresi"),
 
     # -- CİHAZ --
     "Cihaz Listesi":    ("formlar.cihaz_listesi", "CihazListesiPenceresi"),
