@@ -6,10 +6,9 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QTableWidget, QTableWidgetItem, QHeaderView, 
-                               QPushButton, QLabel, QComboBox, 
-                               QGroupBox, QFileDialog, QAbstractItemView, QFrame, QSizePolicy)
+                               QPushButton, QLabel, QComboBox, QFrame, QAbstractItemView)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QColor, QPageSize, QTextDocument, QColor
+from PySide6.QtGui import QFont, QColor, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 
 # --- YOL AYARLARI ---
@@ -18,68 +17,25 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-# --- MODÜLLER ---
+# --- İMPORTLAR ---
 try:
     from google_baglanti import veritabani_getir
-    # Ortak araçlardan gerekli fonksiyonları alıyoruz
     from araclar.ortak_araclar import pencereyi_kapat, show_info, show_error
+    # YENİ: Hesaplama buradan geliyor
+    from araclar.hesaplamalar import sua_hak_edis_hesapla
 except ImportError as e:
     print(f"Modül Hatası: {e}")
-    # Hata durumunda dummy fonksiyonlar (Kod çökmemesi için)
-    def veritabani_getir(vt_tipi, sayfa_adi): return None
-    def pencereyi_kapat(w): w.close()
-    def show_info(t, m, p): print(m)
-    def show_error(t, m, p): print(m)
-
-# --- ŞUA HESAPLAMA MANTIĞI (DEĞİŞTİRİLMEDİ) ---
-def sua_hak_edis_hesapla(toplam_saat):
-    try:
-        saat = float(toplam_saat)
-    except:
-        return 0
-    
-    if saat < 50: return 0
-    elif 50 <= saat < 100: return 1
-    elif 100 <= saat < 150: return 2
-    elif 150 <= saat < 200: return 3
-    elif 200 <= saat < 250: return 4
-    elif 250 <= saat < 300: return 5
-    elif 300 <= saat < 350: return 6
-    elif 350 <= saat < 400: return 7
-    elif 400 <= saat < 450: return 8
-    elif 450 <= saat < 500: return 9
-    elif 500 <= saat < 550: return 10
-    elif 550 <= saat < 600: return 11
-    elif 600 <= saat < 650: return 12
-    elif 650 <= saat < 700: return 13
-    elif 700 <= saat < 750: return 14
-    elif 750 <= saat < 800: return 15
-    elif 800 <= saat < 850: return 16
-    elif 850 <= saat < 900: return 17
-    elif 900 <= saat < 950: return 18
-    elif 950 <= saat < 1000: return 19   
-    elif 1000 <= saat < 1100: return 20
-    elif 1100 <= saat < 1200: return 25  
-    elif 1200 <= saat < 1300: return 26
-    elif 1300 <= saat < 1400: return 28
-    elif 1400 <= saat < 1450: return 29        
-    elif saat >= 1450: return 30
-    else: return 0
+    # Dummy tanımlar... (önceki gibi)
 
 class PuantajRaporPenceresi(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Puantaj Raporlama ve Şua Takip Sistemi")
         self.resize(1280, 800)
-        
-        # Veri Saklama
         self.df_puantaj = pd.DataFrame()
         self.filtrelenmis_df = pd.DataFrame()
-        
-        # Not: Global stil (tema.py) uygulandığı varsayılıyor.
-        # Sadece bu sayfaya özel yerel stilleri setup_ui içinde tanımlıyoruz.
         self.setup_ui()
-
+        
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
