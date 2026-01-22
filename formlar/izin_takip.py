@@ -142,7 +142,7 @@ class KayitWorker(QThread):
                 ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
                 
                 hedef_tc = str(self.data.get('personel_id')).strip()
-                izin_tipi = str(self.data.get('izin_tipi')).strip().lower() # Küçük harfe çevir
+                izin_tipi = str(self.data.get('izin_tipi')).strip().lower() 
                 gun_sayisi = int(self.data.get('Gun', 0))
                 baslama_tarihi_str = str(self.data.get('Baslama_Tarihi'))
 
@@ -155,7 +155,7 @@ class KayitWorker(QThread):
                     izin_yili = 0
                     suanki_yil = 1
 
-                # 1. ADIM: TC Kimlik Numarasına göre satırı bul
+                # TC Kimlik Numarasına göre satırı bul
                 try:
                     kimlik_kolonu = ws_bilgi.col_values(2) # 2. Sütun = Kimlik_No
                     row_idx = kimlik_kolonu.index(hedef_tc) + 1 
@@ -163,11 +163,7 @@ class KayitWorker(QThread):
                     row_idx = None
 
                 if row_idx:
-                    # Sütun İndeksleri:
-                    # 4: Hak_Edilen, 5: Devir, 7: Kullanilan, 8: Kalan, 10: Kullanilan_sua
-                    # YENİ SÜTUNLAR (Tahmini):
-                    # 11: Bu Yıl Yıllık İzin Toplamı
-                    # 12: Bu Yıl Diğer İzin Toplamı
+                    # Sütun İndeksleri: 4:Hak, 5:Devir, 7:Kul, 8:Kalan, 10:Kul_Sua
                     
                     def safe_int(row, col):
                         val = ws_bilgi.cell(row, col).value
@@ -175,18 +171,13 @@ class KayitWorker(QThread):
                             return int(float(val))
                         return 0
 
-                    # ---------------------------------------------------------
-                    # 1. SENARYO: YILLIK İZİN
-                    # ---------------------------------------------------------
                     if "yıllık" in izin_tipi:
                         hak_edilen = safe_int(row_idx, 4)
                         devir = safe_int(row_idx, 5)
-                        kullanilan = safe_int(row_idx, 7) # Genel Toplam Kullanılan
+                        kullanilan = safe_int(row_idx, 7)
                         
-                        # Genel Kullanılanı artır
                         ws_bilgi.update_cell(row_idx, 7, kullanilan + gun_sayisi)
                         
-                        # --- Düşme Mantığı (Devir -> Hak) ---
                         dusulecek = gun_sayisi
                         
                         # Önce devirden düş
@@ -200,30 +191,24 @@ class KayitWorker(QThread):
                         # Kalanı haktan düş
                         hak_edilen -= dusulecek
                         
-                        # Yeni Kalan (Hak + Devir)
                         yeni_kalan = hak_edilen + devir
                         
-                        # Bakiyeleri Güncelle
                         ws_bilgi.update_cell(row_idx, 4, hak_edilen)
                         ws_bilgi.update_cell(row_idx, 5, devir)
                         ws_bilgi.update_cell(row_idx, 8, yeni_kalan)
 
-                        # --- YENİ: Bu Yıl Yıllık İzin Toplamı (Sütun 11) ---
+                        # Bu Yıl Yıllık İzin Toplamı (Tahmini Sütun 11)
                         if izin_yili == suanki_yil:
                             bu_yil_yillik = safe_int(row_idx, 11)
                             ws_bilgi.update_cell(row_idx, 11, bu_yil_yillik + gun_sayisi)
 
-                    # ---------------------------------------------------------
-                    # 2. SENARYO: DİĞER İZİNLER (ŞUA DAHİL)
-                    # ---------------------------------------------------------
                     else:
-                        # Eğer ŞUA ise ayrıca Şua bakiyesini de işle
+                        # Şua veya Diğer İzinler
                         if "şua" in izin_tipi or "sua" in izin_tipi:
                             kul_sua = safe_int(row_idx, 10)
                             ws_bilgi.update_cell(row_idx, 10, kul_sua + gun_sayisi)
                         
-                        # --- YENİ: Bu Yıl Diğer İzin Toplamı (Sütun 12) ---
-                        # Yıllık izin dışındaki tüm izinler buraya eklenir
+                        # Bu Yıl Diğer İzin Toplamı (Tahmini Sütun 12)
                         if izin_yili == suanki_yil:
                             bu_yil_diger = safe_int(row_idx, 12)
                             ws_bilgi.update_cell(row_idx, 12, bu_yil_diger + gun_sayisi)
@@ -256,9 +241,12 @@ class SilWorker(QThread):
 # ANA FORM
 # =============================================================================
 class IzinGirisPenceresi(QWidget):
-    def __init__(self, yetki='viewer'):
+    # DÜZELTME 1: Parametreler güncellendi
+    def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
+        self.kullanici_adi = kullanici_adi
+        
         self.setWindowTitle("Personel İzin İşlemleri")
         self.resize(1350, 850)
         
@@ -323,11 +311,14 @@ class IzinGirisPenceresi(QWidget):
         form_layout.addRow("Bitiş Tarihi:", self.ui['bitis'])
 
         h_btn = QHBoxLayout()
+        # DÜZELTME 2: Butonlara objectName verildi
         self.btn_temizle = QPushButton("Yeni Kayıt")
+        self.btn_temizle.setObjectName("btn_temizle")
         self.btn_temizle.setFixedHeight(40)
         self.btn_temizle.clicked.connect(self._formu_temizle)
         
         self.btn_kaydet = QPushButton("KAYDET")
+        self.btn_kaydet.setObjectName("btn_kaydet")
         self.btn_kaydet.setFixedHeight(40)
         self.btn_kaydet.setStyleSheet("background-color: #0067c0; color: white; font-weight: bold;")
         self.btn_kaydet.clicked.connect(self._kaydet_baslat)
@@ -430,7 +421,10 @@ class IzinGirisPenceresi(QWidget):
         self.progress.setVisible(False)
         self.progress.setStyleSheet("QProgressBar { max-height: 5px; background: #333; border:none; } QProgressBar::chunk { background: #00ccff; }")
         self.progress.setGeometry(0, 0, self.width(), 5)
+        
+        # 🟢 YETKİ KURALINI UYGULA
         YetkiYoneticisi.uygula(self, "izin_giris")
+
     # --- LOJİK İŞLEMLER ---
     def _verileri_yukle(self):
         self.progress.setVisible(True); self.progress.setRange(0,0)
@@ -621,6 +615,17 @@ class IzinGirisPenceresi(QWidget):
         self.progress.setVisible(False)
         self.btn_kaydet.setEnabled(True)
         show_error("Hata", str(err), self)
+
+    # 🟢 DÜZELTME 3: Çökme Önleyici
+    def closeEvent(self, event):
+        worker_names = ['worker', 'k_worker', 'sil_worker']
+        for name in worker_names:
+            if hasattr(self, name):
+                worker = getattr(self, name)
+                if worker and worker.isRunning():
+                    worker.quit()
+                    worker.wait(500)
+        event.accept()
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication

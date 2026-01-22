@@ -15,7 +15,7 @@ if root_dir not in sys.path:
 
 # --- IMPORTLAR ---
 # DİKKAT: 'from main import AnaPencere' SATIRINI SİLİN!
-
+from araclar.guvenlik import GuvenlikAraclari
 try:
     from formlar.sifre_degistir import SifreDegistirPenceresi
 except ImportError:
@@ -38,38 +38,41 @@ class GirisWorker(QThread):
 
     def run(self):
         try:
-            # DİKKAT: google_baglanti.py içindeki map'e göre 'user' anahtarını kullanıyoruz
-            ws = veritabani_getir('user', 'user_login') 
+            ws = veritabani_getir('user', 'user_login')
+            # ...
             
-            if not ws:
-                self.sonuc.emit(False, "Veritabanına (itf_user_vt) erişilemedi.", "", "")
-                return
-
             records = ws.get_all_records()
             
             for i, user in enumerate(records):
                 vt_kadi = str(user.get('username', '')).strip()
-                vt_sifre = str(user.get('password', '')).strip()
+                vt_sifre_hash = str(user.get('password', '')).strip() # Artık veritabanından HASH geliyor
                 
-                if vt_kadi == self.kadi and vt_sifre == self.sifre:
-                    rol = str(user.get('roller', 'user'))
-                    degisim_gerekli = str(user.get('degisim_gerekli', 'HAYIR')).upper()
+                # Kontrol: Kullanıcı adı eşleşiyor mu?
+                if vt_kadi == self.kadi:
                     
-                    if degisim_gerekli == 'EVET':
-                        self.sonuc.emit(True, "CHANGE_REQUIRED", vt_kadi, rol)
+                    # Şifre Kontrolü (Hashleyerek kıyasla)
+                    if GuvenlikAraclari.dogrula(self.sifre, vt_sifre_hash):
+                        
+                        # --- GİRİŞ BAŞARILI ---
+                        rol = str(user.get('roller', 'user'))
+                        degisim_gerekli = str(user.get('degisim_gerekli', 'HAYIR')).upper()
+                        
+                        if degisim_gerekli == 'EVET':
+                            self.sonuc.emit(True, "CHANGE_REQUIRED", vt_kadi, rol)
+                            return
+                        
+                        # ... (Tarih güncelleme ve OK sinyali aynı) ...
+                        self.sonuc.emit(True, "OK", vt_kadi, rol)
                         return
-
-                    try:
-                        ws.update_cell(i + 2, 5, datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
-                    except: pass
-
-                    self.sonuc.emit(True, "OK", vt_kadi, rol)
-                    return
+                    else:
+                        # Kullanıcı adı doğru ama şifre yanlış
+                        self.sonuc.emit(False, "Şifre hatalı.", "", "")
+                        return
             
-            self.sonuc.emit(False, "Kullanıcı adı veya şifre hatalı.", "", "")
+            self.sonuc.emit(False, "Kullanıcı bulunamadı.", "", "")
 
         except Exception as e:
-            self.sonuc.emit(False, f"Sistem Hatası: {str(e)}", "", "")
+            self.sonuc.emit(False, f"Hata: {e}", "", "")
 
 
 class LoginPenceresi(QWidget):

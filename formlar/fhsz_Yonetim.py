@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-# DİKKAT: QPushButton'u import listesine ekledik
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QTabWidget, QLabel, QPushButton
 from PySide6.QtGui import QIcon, QFont
 
@@ -11,6 +10,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- MODÜL İMPORTLARI ---
 try:
     from formlar.fhsz_hesapla import FHSZHesaplamaPenceresi
@@ -18,20 +19,23 @@ try:
     from temalar.tema import TemaYonetimi
 except ImportError as e:
     print(f"Import Hatası: {e}")
-    try:
-        from fhsz_hesapla import FHSZHesaplamaPenceresi
-        from FHSZ_Puantaj import PuantajRaporPenceresi
-    except:
-        pass
-from araclar.yetki_yonetimi import YetkiYoneticisi
+    # Fallback (Hata durumunda programın çökmemesi için)
+    class FHSZHesaplamaPenceresi(QWidget): 
+        def __init__(self, y=None, k=None): super().__init__()
+    class PuantajRaporPenceresi(QWidget): 
+        def __init__(self, y=None, k=None): super().__init__()
+
 # =============================================================================
 # 1. FHSZ YÖNETİM PANELİ
 # =============================================================================
 
 class FHSZYonetimPaneli(QWidget):
-    def __init__(self, yetki='viewer'):
+    # 🟢 DÜZELTME 1: Main.py uyumu için 'kullanici_adi' parametresi eklendi
+    def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
+        self.kullanici_adi = kullanici_adi
+        
         self.setWindowTitle("FHSZ Yönetim Sistemi")
         self.resize(1350, 900)
         
@@ -42,12 +46,12 @@ class FHSZYonetimPaneli(QWidget):
         
         # --- BAŞLIK ---
         lbl_baslik = QLabel("Radyoloji / FHSZ (Şua) Takip Sistemi")
-        # Eğer tema dosyanız yoksa veya hata verirse font kısmını basitleştirebilirsiniz
         lbl_baslik.setStyleSheet("font-size: 20px; font-weight: bold; color: #4dabf7; margin-bottom: 5px;")
         layout.addWidget(lbl_baslik)
 
         # --- SEKME (TAB) YAPISI ---
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("tabs_fhsz") # Yetki için isim
         self.tabs.setStyleSheet("""
             QTabWidget::pane { 
                 border: 1px solid #3e3e42; 
@@ -78,42 +82,51 @@ class FHSZYonetimPaneli(QWidget):
         """)
 
         # --- 1. SEKME: HESAPLAMA ---
-        self.tab_hesapla = FHSZHesaplamaPenceresi(self.yetki)
+        # Yetki ve kullanıcı adını alt forma iletiyoruz
+        self.tab_hesapla = FHSZHesaplamaPenceresi(self.yetki, self.kullanici_adi)
+        self.tab_hesapla.setObjectName("tab_hesapla") # Yetki için
         
-        # Buton gizleme (Güvenli Yöntem)
+        # Alt formdaki "Kapat/Çıkış" butonlarını gizle (Çünkü zaten ana pencere içinde)
+        # 1. Yöntem: Doğrudan erişim (Varsa)
         if hasattr(self.tab_hesapla, 'btn_kapat'):
             self.tab_hesapla.btn_kapat.setVisible(False)
+        # 2. Yöntem: Genel arama (Yedek)
         else:
-            # Sadece QPushButton olanları buluyoruz
             btns = self.tab_hesapla.findChildren(QPushButton)
             for b in btns:
-                if "Çıkış" in b.text() or "İptal" in b.text():
+                text = b.text().lower()
+                if "çıkış" in text or "iptal" in text or "kapat" in text:
                     b.setVisible(False)
             
         self.tabs.addTab(self.tab_hesapla, "📝 Hesaplama ve Veri Girişi")
 
         # --- 2. SEKME: RAPORLAMA ---
-        self.tab_rapor = PuantajRaporPenceresi(self.yetki)
+        # Yetki ve kullanıcı adını alt forma iletiyoruz
+        self.tab_rapor = PuantajRaporPenceresi(self.yetki, self.kullanici_adi)
+        self.tab_rapor.setObjectName("tab_rapor") # Yetki için
         
-        # Buton gizleme (Güvenli Yöntem)
-        if hasattr(self.tab_rapor, 'btn_kapat'): 
+        # Buton gizleme
+        if hasattr(self.tab_rapor, 'btn_kapat'): # btn_kapat varsa gizle
              self.tab_rapor.btn_kapat.setVisible(False)
         else:
-            # DÜZELTME BURADA: QWidget yerine QPushButton kullanıldı.
-            # Artık sadece butonları tarıyor, QFrame hatası vermez.
-            btns = self.tab_rapor.findChildren(QPushButton) 
+            btns = self.tab_rapor.findChildren(QPushButton)
             for b in btns:
-                if "Çıkış" in b.text() or "İptal" in b.text():
+                text = b.text().lower()
+                if "çıkış" in text or "iptal" in text or "kapat" in text:
                     b.setVisible(False)
 
         self.tabs.addTab(self.tab_rapor, "📊 Raporlar ve Analiz")
+        
+        # 🟢 YETKİ KURALINI UYGULA
         YetkiYoneticisi.uygula(self, "fhsz_yonetim")
+        
         layout.addWidget(self.tabs)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     try:
+        from temalar.tema import TemaYonetimi
         TemaYonetimi.uygula_fusion_dark(app)
     except:
         app.setStyle("Fusion")

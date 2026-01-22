@@ -9,6 +9,14 @@ try:
 except ImportError:
     pass
 
+# --- YOL AYARLARI ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+    
+from araclar.guvenlik import GuvenlikAraclari
+
 class SifreGuncelleWorker(QThread):
     sonuc = Signal(bool, str)
 
@@ -26,10 +34,12 @@ class SifreGuncelleWorker(QThread):
 
             cell = ws.find(self.kadi)
             if cell:
-                # 3. Sütun: Password, 6. Sütun: degisim_gerekli
-                # Not: find hücresi (row, col) döner.
-                ws.update_cell(cell.row, 3, self.yeni_sifre)
-                ws.update_cell(cell.row, 6, "HAYIR") # Artık değişim gerekmiyor
+                # ŞİFRELEME BURADA
+                yeni_sifre_hash = GuvenlikAraclari.sifrele(self.yeni_sifre)
+                
+                # 3. Sütun: Password (Hashli kaydediyoruz)
+                ws.update_cell(cell.row, 3, yeni_sifre_hash)
+                ws.update_cell(cell.row, 6, "HAYIR") 
                 self.sonuc.emit(True, "Şifre başarıyla güncellendi.")
             else:
                 self.sonuc.emit(False, "Kullanıcı bulunamadı.")

@@ -204,9 +204,12 @@ class KayitWorker(QThread):
 # 3. ANA FORM
 # =============================================================================
 class PersonelEklePenceresi(QWidget):
-    def __init__(self, yetki='viewer'): # Yetki alabilir hale getirin
+    # DÜZELTME 1: Main.py uyumu için 'kullanici_adi' parametresi eklendi
+    def __init__(self, yetki='viewer', kullanici_adi=None): 
         super().__init__()
         self.yetki = yetki
+        self.kullanici_adi = kullanici_adi # Şimdilik kullanılmasa da saklayalım
+        
         self.setWindowTitle("Yeni Personel Ekle")
         self.resize(1200, 800)
         
@@ -215,6 +218,11 @@ class PersonelEklePenceresi(QWidget):
         self.ui = {} 
 
         self._setup_ui()
+        
+        # 🟢 YETKİ KONTROLÜ
+        YetkiYoneticisi.uygula(self, "personel_ekle")
+        
+        # Verileri Yükle
         self._baslangic_yukle()
 
     def _setup_ui(self):
@@ -315,11 +323,15 @@ class PersonelEklePenceresi(QWidget):
         footer = QHBoxLayout()
         self.progress = QProgressBar(); self.progress.setVisible(False)
         btn_iptal = QPushButton("İptal"); btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
-        self.btn_kaydet = QPushButton("Personel Kaydet"); self.btn_kaydet.clicked.connect(self._kaydet_baslat)
+        
+        # 🟢 DÜZELTME 2: Butona objectName verdik (Style ve Yetki için)
+        self.btn_kaydet = QPushButton("Personel Kaydet")
+        self.btn_kaydet.setObjectName("btn_kaydet") 
+        self.btn_kaydet.clicked.connect(self._kaydet_baslat)
+        
         footer.addWidget(self.progress); footer.addStretch()
         footer.addWidget(btn_iptal); footer.addWidget(self.btn_kaydet)
         main_layout.addLayout(footer)
-        YetkiYoneticisi.uygula(self, "personel_ekle")
         
     def _create_editable_combo(self, layout, label):
         combo = add_combo_box(layout, label, items=[])
@@ -397,6 +409,19 @@ class PersonelEklePenceresi(QWidget):
         self.btn_kaydet.setEnabled(True)
         self.btn_kaydet.setText("Personel Kaydet")
         show_error("Kayıt Hatası", err, self)
+
+    # 🟢 DÜZELTME 3: Çökme Önleyici Kapanış Olayı (Close Event)
+    def closeEvent(self, event):
+        """Pencere kapatılırken çalışan işçileri güvenli şekilde durdur."""
+        if hasattr(self, 'loader') and self.loader.isRunning():
+            self.loader.quit()
+            self.loader.wait(500)
+        
+        if hasattr(self, 'worker') and self.worker.isRunning():
+            self.worker.quit()
+            self.worker.wait(500)
+            
+        event.accept()
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication
