@@ -23,10 +23,15 @@ except ImportError as e:
         from FHSZ_Puantaj import PuantajRaporPenceresi
     except:
         pass
+from araclar.yetki_yonetimi import YetkiYoneticisi
+# =============================================================================
+# 1. FHSZ YÖNETİM PANELİ
+# =============================================================================
 
 class FHSZYonetimPaneli(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer'):
         super().__init__()
+        self.yetki = yetki
         self.setWindowTitle("FHSZ Yönetim Sistemi")
         self.resize(1350, 900)
         
@@ -73,7 +78,7 @@ class FHSZYonetimPaneli(QWidget):
         """)
 
         # --- 1. SEKME: HESAPLAMA ---
-        self.tab_hesapla = FHSZHesaplamaPenceresi()
+        self.tab_hesapla = FHSZHesaplamaPenceresi(self.yetki)
         
         # Buton gizleme (Güvenli Yöntem)
         if hasattr(self.tab_hesapla, 'btn_kapat'):
@@ -88,7 +93,7 @@ class FHSZYonetimPaneli(QWidget):
         self.tabs.addTab(self.tab_hesapla, "📝 Hesaplama ve Veri Girişi")
 
         # --- 2. SEKME: RAPORLAMA ---
-        self.tab_rapor = PuantajRaporPenceresi()
+        self.tab_rapor = PuantajRaporPenceresi(self.yetki)
         
         # Buton gizleme (Güvenli Yöntem)
         if hasattr(self.tab_rapor, 'btn_kapat'): 
@@ -102,7 +107,7 @@ class FHSZYonetimPaneli(QWidget):
                     b.setVisible(False)
 
         self.tabs.addTab(self.tab_rapor, "📊 Raporlar ve Analiz")
-
+        YetkiYoneticisi.uygula(self, "fhsz_yonetim")
         layout.addWidget(self.tabs)
 
 if __name__ == "__main__":

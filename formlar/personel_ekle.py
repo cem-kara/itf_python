@@ -18,6 +18,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- MODÜLLER ---
 try:
     from google_baglanti import veritabani_getir
@@ -202,8 +204,9 @@ class KayitWorker(QThread):
 # 3. ANA FORM
 # =============================================================================
 class PersonelEklePenceresi(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer'): # Yetki alabilir hale getirin
         super().__init__()
+        self.yetki = yetki
         self.setWindowTitle("Yeni Personel Ekle")
         self.resize(1200, 800)
         
@@ -316,7 +319,8 @@ class PersonelEklePenceresi(QWidget):
         footer.addWidget(self.progress); footer.addStretch()
         footer.addWidget(btn_iptal); footer.addWidget(self.btn_kaydet)
         main_layout.addLayout(footer)
-
+        YetkiYoneticisi.uygula(self, "personel_ekle")
+        
     def _create_editable_combo(self, layout, label):
         combo = add_combo_box(layout, label, items=[])
         combo.setEditable(True)

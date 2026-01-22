@@ -3,7 +3,7 @@ import sys
 import os
 import logging
 import re
-import urllib.request # Resim indirmek için
+import urllib.request 
 
 # PySide6 Kütüphaneleri
 from PySide6.QtCore import Qt, QDate, QThread, Signal
@@ -19,6 +19,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
+
+# Yetki Yöneticisi
+from araclar.yetki_yonetimi import YetkiYoneticisi
 
 # --- MODÜLLER ---
 try:
@@ -45,9 +48,6 @@ logger = logging.getLogger("PersonelDetay")
 # 1. BAŞLANGIÇ YÜKLEYİCİ (SABİTLER VE DRIVE ID'LERİ)
 # =============================================================================
 class BaslangicYukleyici(QThread):
-    """
-    Sabitleri, Drive Klasör ID'lerini ve Auto-Complete verilerini çeker.
-    """
     veri_hazir = Signal(dict)
     
     def run(self):
@@ -94,7 +94,7 @@ class BaslangicYukleyici(QThread):
         self.veri_hazir.emit(sonuc_dict)
 
 # =============================================================================
-# 2. RESİM İNDİRME İŞÇİSİ (Drive'dan Önizleme İçin)
+# 2. RESİM İNDİRME İŞÇİSİ
 # =============================================================================
 class ResimIndirWorker(QThread):
     resim_indi = Signal(QPixmap)
@@ -106,7 +106,6 @@ class ResimIndirWorker(QThread):
 
     def run(self):
         try:
-            # URL'den ID'yi ayıkla
             match = re.search(r'/d/([a-zA-Z0-9_-]+)', self.url)
             if match:
                 file_id = match.group(1)
@@ -124,7 +123,7 @@ class ResimIndirWorker(QThread):
             self.hata.emit()
 
 # =============================================================================
-# 3. GÜNCELLEME İŞÇİSİ (Dosya Yükleme + Satır Güncelleme)
+# 3. GÜNCELLEME İŞÇİSİ
 # =============================================================================
 class GuncelleWorker(QThread):
     islem_tamam = Signal()
@@ -140,7 +139,6 @@ class GuncelleWorker(QThread):
 
     def run(self):
         try:
-            # A. Dosya Yükleme
             final_links = self.old_links.copy()
             tc_no = self.data.get('tc', '00000000000')
 
@@ -150,26 +148,21 @@ class GuncelleWorker(QThread):
                 id_diploma = self.drive_ids.get("Personel_Diploma", "")
 
                 for key, path in self.files.items():
-                    # Sadece yeni seçilen (path dolu olan) dosyaları yükle
                     if path and os.path.exists(path):
                         try:
                             hedef_id = id_resim if key == "Resim" else id_diploma
-                            if target_id := hedef_id:
+                            if hedef_id:
                                 _, uzanti = os.path.splitext(path)
-                                
-                                # İsimlendirme Formatı
                                 if key == "Resim": yeni_isim = f"{tc_no}_profil_resim{uzanti}"
                                 elif key == "Diploma1": yeni_isim = f"{tc_no}_diploma_1{uzanti}"
                                 elif key == "Diploma2": yeni_isim = f"{tc_no}_diploma_2{uzanti}"
                                 else: yeni_isim = os.path.basename(path)
 
-                                link = drive.upload_file(path, target_id, custom_name=yeni_isim)
-                                if link:
-                                    final_links[key] = link
+                                link = drive.upload_file(path, hedef_id, custom_name=yeni_isim)
+                                if link: final_links[key] = link
                         except Exception as e:
                             print(f"{key} yükleme hatası: {e}")
 
-            # B. Veri Hazırlama
             row_data = [
                 self.data.get('tc'), self.data.get('ad_soyad'), self.data.get('dogum_yeri'),
                 self.data.get('dogum_tarihi'), self.data.get('hizmet_sinifi'), self.data.get('kadro_unvani'),
@@ -183,10 +176,9 @@ class GuncelleWorker(QThread):
                 final_links.get('Diploma2', '')
             ]
 
-            # C. Veritabanı Güncelleme
             ws = veritabani_getir('personel', 'Personel')
             if ws:
-                cell = ws.find(self.eski_tc) # TC'ye göre satırı bul
+                cell = ws.find(self.eski_tc)
                 if cell:
                     ws.update(f"A{cell.row}", [row_data]) 
                     self.islem_tamam.emit()
@@ -225,20 +217,34 @@ class SilWorker(QThread):
 class PersonelDetayPenceresi(QWidget):
     veri_guncellendi = Signal() 
 
-    def __init__(self, personel_data=None):
+    def __init__(self, personel_data, yetki='viewer', giris_yapan_tc=None):
         super().__init__()
         self.setWindowTitle("Personel Detay ve Güncelleme")
         self.resize(1200, 800)
         
+        # Değişkenleri Ata
         self.personel_data = personel_data if personel_data else []
+        self.yetki = yetki
+        self.giris_yapan_tc = str(giris_yapan_tc).strip()
+        self.profil_tc = str(self.personel_data[0]).strip() if self.personel_data else ""
+
         self.ui = {}
-        # Sadece yeni seçilen dosyaları tutar
         self.dosya_yollari = {"Resim": None, "Diploma1": None, "Diploma2": None}
-        # Veritabanından gelen mevcut linkleri tutar
         self.mevcut_linkler = {"Resim": "", "Diploma1": "", "Diploma2": ""}
         self.drive_config = {}
 
-        self._setup_ui()
+        # 1. Arayüzü Kur
+        self._setup_ui() 
+
+        # 2. Yetki Kontrolü (Hemen arayüzden sonra)
+        # Eğer giriş yapan kişi, kendi profiline bakıyorsa kısıtlama uygulama!
+        if self.giris_yapan_tc and self.profil_tc and self.giris_yapan_tc == self.profil_tc:
+            pass # Kendi profili: Her şey serbest
+        else:
+            # Başkasının profili: Rol kısıtlamalarını uygula
+            YetkiYoneticisi.uygula(self, "personel_detay")
+
+        # 3. Verileri Arka Planda Yüklemeye Başla
         self._baslangic_yukle()
 
     def _setup_ui(self):
@@ -272,7 +278,7 @@ class PersonelDetayPenceresi(QWidget):
         grp_kimlik = create_group_box("Kimlik")
         form_kimlik = create_form_layout()
         self.ui['tc'] = add_line_edit(form_kimlik, "TC No:", max_length=11, only_int=True)
-        self.ui['tc'].setReadOnly(True) # TC değiştirilemez
+        self.ui['tc'].setReadOnly(True) 
         self.ui['ad_soyad'] = add_line_edit(form_kimlik, "Ad Soyad:")
         self.ui['dogum_yeri'] = self._create_editable_combo(form_kimlik, "Doğum Yeri:")
         self.ui['dogum_tarihi'] = add_date_edit(form_kimlik, "Doğum Tarihi:")
@@ -337,13 +343,13 @@ class PersonelDetayPenceresi(QWidget):
         # BUTONLAR
         footer = QHBoxLayout()
         self.progress = QProgressBar(); self.progress.setVisible(False)
-        btn_sil = QPushButton("Kaydı Sil"); btn_sil.setStyleSheet("background:#d32f2f;color:white;font-weight:bold;height:40px")
-        btn_sil.clicked.connect(self._kayit_sil_onay)
+        self.btn_sil = QPushButton("Kaydı Sil"); self.btn_sil.setStyleSheet("background:#d32f2f;color:white;font-weight:bold;height:40px")
+        self.btn_sil.clicked.connect(self._kayit_sil_onay)
         btn_iptal = QPushButton("Kapat"); btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
         self.btn_kaydet = QPushButton("Güncelle"); self.btn_kaydet.clicked.connect(self._guncelle_baslat)
         self.btn_kaydet.setStyleSheet("background:#0067c0;color:white;font-weight:bold;height:40px")
         
-        footer.addWidget(btn_sil); footer.addWidget(self.progress); footer.addStretch()
+        footer.addWidget(self.btn_sil); footer.addWidget(self.progress); footer.addStretch()
         footer.addWidget(btn_iptal); footer.addWidget(self.btn_kaydet)
         main_layout.addLayout(footer)
 
@@ -403,12 +409,10 @@ class PersonelDetayPenceresi(QWidget):
             self._tarih_set('mezun_tarihi2', d[17])
             self.ui['diploma_no2'].setText(str(d[18]))
             
-            # Linkleri Sakla
             if len(d) > 19: self.mevcut_linkler["Resim"] = str(d[19])
             if len(d) > 20: self.mevcut_linkler["Diploma1"] = str(d[20])
             if len(d) > 21: self.mevcut_linkler["Diploma2"] = str(d[21])
             
-            # Resim İndir
             if self.mevcut_linkler["Resim"]:
                 self.lbl_resim_onizleme.setText("İndiriliyor...")
                 self.resim_worker = ResimIndirWorker(self.mevcut_linkler["Resim"])
@@ -481,6 +485,7 @@ if __name__ == "__main__":
     from temalar.tema import TemaYonetimi
     app = QApplication(sys.argv)
     TemaYonetimi.uygula_fusion_dark(app)
-    win = PersonelDetayPenceresi()
+    # Test için boş bir data ile açılabilir
+    win = PersonelDetayPenceresi(["11111111111", "Test Personel"])
     win.show()
     sys.exit(app.exec())

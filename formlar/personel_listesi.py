@@ -18,6 +18,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- MODÜLLER ---
 try:
     from google_baglanti import veritabani_getir
@@ -128,7 +130,7 @@ class KullaniciEkleWorker(QThread):
 # PERSONEL LİSTESİ FORMU
 # =============================================================================
 class PersonelListesiPenceresi(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.setWindowTitle("Personel Listesi")
         self.resize(1200, 700)
@@ -137,6 +139,8 @@ class PersonelListesiPenceresi(QWidget):
         self._setup_ui()
         self._sabitleri_yukle()
         self._verileri_yenile()
+        self.yetki = yetki
+        self.kullanici_adi = kullanici_adi
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -361,12 +365,15 @@ class PersonelListesiPenceresi(QWidget):
             self.table.setItem(i, col_idx, item_durum)
 
             self.table.item(i, 0).setData(Qt.UserRole, row)
-
+            YetkiYoneticisi.uygula(self, "personel_listesi")
     def _detay_ac(self, row, column):
         item = self.table.item(row, 0)
         if item:
             personel_data = item.data(Qt.UserRole)
-            self.detay_penceresi = PersonelDetayPenceresi(personel_data)
+            
+            # Detay penceresine 'kullanici_adi'nı (Giriş yapan TC) gönderiyoruz
+            self.detay_penceresi = PersonelDetayPenceresi(personel_data, self.yetki, self.kullanici_adi)
+            
             self.detay_penceresi.veri_guncellendi.connect(self._verileri_yenile)
             mdi_pencere_ac(self, self.detay_penceresi, "Personel Detay Kartı")
 

@@ -8,7 +8,7 @@ from functools import partial
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QMdiArea, QMdiSubWindow, 
     QWidget, QVBoxLayout, QHBoxLayout, QStatusBar, 
-    QFrame, QPushButton, QMessageBox, QToolBox
+    QFrame, QPushButton, QMessageBox, QToolBox, QStackedWidget
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QAction, QIcon, QFont
@@ -22,12 +22,20 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
+# --- İMPORTLAR ---
+# Login penceresini buradan import ediyoruz çünkü Yönetici sınıfı kullanacak
+try:
+    from formlar.login import LoginPenceresi
+except ImportError:
+    pass # Hata yönetimi aşağıda yapılacak
+
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- MODÜLER IMPORTLAR ---
 try:
     from temalar.tema import TemaYonetimi
     from araclar.ortak_araclar import pencereyi_kapat
 except ImportError as e:
-    # Kritik modüller yoksa program çalışmaz, bu yüzden burası teknik kalmalı
     logger.critical(f"Temel modüller eksik: {e}")
     sys.exit(1)
 
@@ -37,7 +45,7 @@ except ImportError as e:
 FORM_MAP = {
     # -- GENEL --
     "Dashboard":        ("formlar.dashboard", "DashboardPenceresi"),
-    "User Login":       ("formlar.login", "LoginPenceresi"),
+    # "User Login":       ("formlar.login", "LoginPenceresi"), # Login artık menüden açılmayacak
     "Ayarlar":          ("formlar.ayarlar", "AyarlarPenceresi"),
     
     # -- PERSONEL --
@@ -45,7 +53,7 @@ FORM_MAP = {
     "Personel Ekle":    ("formlar.personel_ekle", "PersonelEklePenceresi"),
     "İzin Takip":       ("formlar.izin_takip", "IzinGirisPenceresi"),
     "FHSZ Yönetim":     ("formlar.fhsz_Yonetim", "FHSZYonetimPaneli"),
-    "Personel Verileri":     ("formlar.user_dashboard", "DashboardWidget"),
+    "Personel Verileri": ("formlar.user_dashboard", "DashboardWidget"),
 
     # -- CİHAZ --
     "Cihaz Listesi":    ("formlar.cihaz_listesi", "CihazListesiPenceresi"),
@@ -63,25 +71,34 @@ FORM_MAP = {
 
 # Akordeon Menü Yapısı (AYNEN KORUNDU)
 MENU_STRUCTURE = {
-    "GENEL": ["Dashboard", "User Login", "Ayarlar"],
+    "GENEL": ["Dashboard", "Ayarlar"], # User Login kaldırıldı
     "PERSONEL": ["Personel Listesi", "Personel Ekle", "İzin Takip", "FHSZ Yönetim", "Personel Verileri"],
     "CİHAZ": ["Cihaz Listesi", "Cihaz Ekle", "Ariza Kaydi", "Ariza Listesi", "Periyodik Bakim", "Kalibrasyon Takip"],
     "RKE": ["RKE Listesi", "Muayene Girişi", "RKE Raporlama"]
 }
 
+# -----------------------------------------------------------------------------
+# ANA PENCERE SINIFI
+# -----------------------------------------------------------------------------
 class AnaPencere(QMainWindow):
-    def __init__(self):
+    def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
-        self.setWindowTitle("ITF Python Yönetim Sistemi (v1.0)")
-        self.resize(1280, 800)
+        self.yetki = yetki
+        self.kullanici_adi = kullanici_adi # Giriş yapanın TC'si
         
+        self.setWindowTitle(f"ITF Python Yönetim Sistemi (v1.0) - {self.yetki.upper()}")
+        self.resize(1280, 800)
+
         # UI Kurulumu
         self._setup_ui()
         
         # Durum Çubuğu
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Sistem Hazır.")
+        self.status_bar.showMessage(f"Hoşgeldiniz: {self.kullanici_adi} ({self.yetki})")
+
+        # --- YETKİ KURALINI UYGULA ---
+        YetkiYoneticisi.uygula(self, "main_window")
 
     def _setup_ui(self):
         """Ana pencere düzeni: Sol Akordeon Menü + Sağ MDI Alanı"""
@@ -123,10 +140,22 @@ class AnaPencere(QMainWindow):
             page_layout.setSpacing(5)
             page_layout.setAlignment(Qt.AlignTop)
 
+            # ... (Döngü başlangıcı aynı) ...
             for item_name in elemanlar:
                 if item_name in FORM_MAP:
                     btn = QPushButton(f"  {item_name}")
                     btn.setCursor(Qt.PointingHandCursor)
+                    
+                    # btn object name ataması
+                    safe_name = "btn_" + item_name.lower().replace(" ", "_").replace("ç","c").replace("ğ","g").replace("ı","i").replace("ö","o").replace("ş","s").replace("ü","u")
+                    btn.setObjectName(safe_name)
+
+                    # ========================================================
+                    # 🔴 EKLEMEN GEREKEN KRİTİK SATIR BURASI:
+                    # Bu satır, butonu "self.btn_personel_listesi" gibi kaydeder.
+                    setattr(self, safe_name, btn) 
+                    # ========================================================
+                    
                     btn.setStyleSheet("""
                         QPushButton {
                             text-align: center-left;
@@ -138,6 +167,7 @@ class AnaPencere(QMainWindow):
                         }
                         QPushButton:hover { background-color: #3e3e3e; color: white; }
                     """)
+                    
                     # Sinyal Bağlama
                     btn.clicked.connect(partial(self.form_ac, item_name))
                     page_layout.addWidget(btn)
@@ -147,10 +177,11 @@ class AnaPencere(QMainWindow):
         sidebar_layout.addWidget(self.toolbox)
         
         # Çıkış Butonu
-        btn_cikis = QPushButton(" Çıkış Yap")
-        btn_cikis.setStyleSheet("background-color: #d32f2f; color: white; padding: 10px; border: none; font-weight: bold;")
-        btn_cikis.clicked.connect(self.close)
-        sidebar_layout.addWidget(btn_cikis)
+        self.btn_cikis = QPushButton(" Çıkış Yap") # self ekledik, yetki için
+        self.btn_cikis.setObjectName("btn_cikis")
+        self.btn_cikis.setStyleSheet("background-color: #d32f2f; color: white; padding: 10px; border: none; font-weight: bold;")
+        self.btn_cikis.clicked.connect(self.close)
+        sidebar_layout.addWidget(self.btn_cikis)
 
         # 2. SAĞ TARAF (MDI Area)
         self.mdi_area = QMdiArea()
@@ -189,7 +220,19 @@ class AnaPencere(QMainWindow):
             
             # 3. Sınıfı Bul ve Örnekle
             FormSinifi = getattr(modul, class_name)
-            form_instance = FormSinifi()
+            
+            # -- YETKİ VE KULLANICI ADI AKTARIMI (ÖNEMLİ) --
+            # Eğer form sınıfı bu parametreleri kabul ediyorsa gönder
+            try:
+                # Bazı formlar parametre almayabilir, hata almamak için try-except
+                form_instance = FormSinifi(yetki=self.yetki, kullanici_adi=self.kullanici_adi)
+            except TypeError:
+                try:
+                    # Sadece yetki alıyor olabilir
+                     form_instance = FormSinifi(yetki=self.yetki)
+                except TypeError:
+                     # Hiç parametre almıyordur
+                     form_instance = FormSinifi()
             
             # 4. MDI Penceresi Olarak Ekle
             sub = self.mdi_area.addSubWindow(form_instance)
@@ -199,47 +242,71 @@ class AnaPencere(QMainWindow):
             self.status_bar.showMessage(f"Açıldı: {form_key}")
 
         except (ImportError, ModuleNotFoundError):
-            # --- ŞIK HATA MESAJI (DOSYA BULUNAMADI) ---
             logger.warning(f"Modül henüz hazır değil: {module_path}")
-            
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle("Yapım Aşamasında 🚧")
             msg_box.setText(f"<h3>{form_key}</h3>")
-            msg_box.setInformativeText(
-                "Bu modül şu anda geliştirme aşamasındadır.<br>"
-                "En kısa sürede sisteme eklenecektir.<br><br>"
-                "<i>Anlayışınız için teşekkürler.</i>"
-            )
-            msg_box.setIcon(QMessageBox.Information) # Kritik yerine Bilgi ikonu
-            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.setInformativeText("Bu modül şu anda geliştirme aşamasındadır.")
+            msg_box.setIcon(QMessageBox.Information)
             msg_box.exec()
-            
             self.status_bar.showMessage("Modül henüz aktif değil.")
 
         except AttributeError:
-            # --- ŞIK HATA MESAJI (SINIF BULUNAMADI) ---
             logger.warning(f"Sınıf bulunamadı: {class_name} -> {module_path}")
-            
-            QMessageBox.information(
-                self, 
-                "Yapım Aşamasında 🚧", 
-                f"<b>{form_key}</b> için arayüz tasarımı henüz tamamlanmamıştır.<br>"
-                "Lütfen daha sonra tekrar deneyiniz."
-            )
-            self.status_bar.showMessage("Sınıf tanımlı değil.")
+            QMessageBox.information(self, "Hata", f"Sınıf tanımı eksik: {class_name}")
 
         except Exception as e:
-            # --- GERÇEK BEKLENMEDİK HATALAR ---
             logger.error(f"Beklenmeyen hata: {e}")
             QMessageBox.critical(self, "Sistem Hatası", f"Beklenmedik bir hata oluştu:\n{str(e)}")
+
+# -----------------------------------------------------------------------------
+# PROGRAM YÖNETİCİSİ (CONTROLLER)
+# -----------------------------------------------------------------------------
+class ProgramYoneticisi:
+    def __init__(self):
+        self.login_window = None
+        self.main_window = None
+
+    def baslat(self):
+        """Uygulamayı Login ekranı ile başlatır."""
+        try:
+            # Login penceresini oluştur
+            self.login_window = LoginPenceresi()
+            # Sinyal bağlantısı: Login başarılı olunca ana_pencereyi_ac çalışacak
+            self.login_window.giris_basarili.connect(self.ana_pencereyi_ac)
+            self.login_window.show()
+        except Exception as e:
+            QMessageBox.critical(None, "Başlatma Hatası", f"Login ekranı açılamadı:\n{e}")
+            sys.exit(1)
+
+    def ana_pencereyi_ac(self, rol, tc_kimlik):
+        """Login başarılı olduğunda tetiklenir."""
+        try:
+            # 1. Yetkileri Yükle
+            YetkiYoneticisi.yetkileri_yukle(rol)
+            
+            # 2. Ana Pencereyi Başlat
+            self.main_window = AnaPencere(yetki=rol, kullanici_adi=tc_kimlik)
+            self.main_window.showMaximized()
+            
+            # 3. Login penceresi referansını temizle (zaten kapandı)
+            self.login_window = None
+            
+        except Exception as e:
+            QMessageBox.critical(None, "Hata", f"Ana pencere yüklenemedi:\n{e}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     # --- TEMANIN UYGULANMASI ---
-    TemaYonetimi.uygula_fusion_dark(app)
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except:
+        pass
     
-    pencere = AnaPencere()
-    pencere.showMaximized()
+    # Yönetici Sınıfı ile Başlat
+    yonetici = ProgramYoneticisi()
+    yonetici.baslat()
     
     sys.exit(app.exec())

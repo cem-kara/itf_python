@@ -18,6 +18,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- İMPORTLAR ---
 try:
     from google_baglanti import veritabani_getir
@@ -35,8 +37,9 @@ except ImportError as e:
     def is_gunu_hesapla(b, e, t): return 0
 
 class FHSZHesaplamaPenceresi(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer'):
         super().__init__()
+        self.yetki = yetki
         self.setWindowTitle("Fiili Hizmet Süresi (Şua) Hesaplama Paneli")
         self.resize(1300, 850)
         
@@ -194,6 +197,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.cmb_yil.currentIndexChanged.connect(self.donem_guncelle_label)
         self.cmb_ay.currentIndexChanged.connect(self.donem_guncelle_label)
         self.donem_guncelle_label()
+        YetkiYoneticisi.uygula(self, "fhsz_hesapla")
 
     def donem_guncelle_label(self):
         try:

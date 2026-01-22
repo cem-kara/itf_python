@@ -17,6 +17,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- İMPORTLAR ---
 try:
     from google_baglanti import veritabani_getir
@@ -28,8 +30,9 @@ except ImportError as e:
     # Dummy tanımlar... (önceki gibi)
 
 class PuantajRaporPenceresi(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer'):
         super().__init__()
+        self.yetki = yetki
         self.setWindowTitle("Puantaj Raporlama ve Şua Takip Sistemi")
         self.resize(1280, 800)
         self.df_puantaj = pd.DataFrame()
@@ -188,6 +191,7 @@ class PuantajRaporPenceresi(QWidget):
         bottom_layout.addWidget(btn_pdf)
 
         main_layout.addLayout(bottom_layout)
+        YetkiYoneticisi.uygula(self, "fhsz_puantaj")
 
     # --- FONKSİYONLAR ---
 

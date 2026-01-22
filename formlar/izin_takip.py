@@ -20,6 +20,8 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
+from araclar.yetki_yonetimi import YetkiYoneticisi
+
 # --- MODÜLLER ---
 try:
     from google_baglanti import veritabani_getir
@@ -254,8 +256,9 @@ class SilWorker(QThread):
 # ANA FORM
 # =============================================================================
 class IzinGirisPenceresi(QWidget):
-    def __init__(self):
+    def __init__(self, yetki='viewer'):
         super().__init__()
+        self.yetki = yetki
         self.setWindowTitle("Personel İzin İşlemleri")
         self.resize(1350, 850)
         
@@ -427,7 +430,7 @@ class IzinGirisPenceresi(QWidget):
         self.progress.setVisible(False)
         self.progress.setStyleSheet("QProgressBar { max-height: 5px; background: #333; border:none; } QProgressBar::chunk { background: #00ccff; }")
         self.progress.setGeometry(0, 0, self.width(), 5)
-
+        YetkiYoneticisi.uygula(self, "izin_giris")
     # --- LOJİK İŞLEMLER ---
     def _verileri_yukle(self):
         self.progress.setVisible(True); self.progress.setRange(0,0)
