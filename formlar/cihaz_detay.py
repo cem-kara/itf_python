@@ -12,7 +12,7 @@ from PySide6.QtGui import QPixmap, QCursor, QFont, QColor, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton, QMessageBox,
                                QScrollArea, QFrame, QFileDialog, QGridLayout, 
-                               QProgressBar, QGraphicsDropShadowEffect, QSizePolicy, QMdiSubWindow)
+                               QProgressBar, QSizePolicy, QMdiSubWindow, QGraphicsDropShadowEffect)
 
 # --- LOGLAMA ---
 logging.basicConfig(level=logging.INFO)
@@ -179,7 +179,7 @@ class GuncellemeIslemi(QThread):
         except Exception as e: self.hata_olustu.emit(str(e))
 
 # =============================================================================
-# 3. UI: MODERN KONTROLLER
+# 2. UI: MODERN KONTROLLER (cihaz_ekle.py ile EŞİTLENDİ)
 # =============================================================================
 class ModernInputGroup(QWidget):
     def __init__(self, label_text, widget, parent=None):
@@ -189,11 +189,11 @@ class ModernInputGroup(QWidget):
         layout.setSpacing(4)
         
         self.lbl = QLabel(label_text)
-        self.lbl.setStyleSheet("color: #b0b0b0; font-size: 12px; font-weight: bold; text-transform: uppercase;")
+        self.lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
         
         self.widget = widget
-        self.widget.setMinimumHeight(30)
-        self.widget.setMinimumWidth(200)
+        self.widget.setMinimumHeight(40)
+        self.widget.setMinimumWidth(150)
         
         self.widget.setStyleSheet("""
             QLineEdit, QComboBox, QDateEdit {
@@ -246,10 +246,9 @@ class InfoCard(QFrame):
         self.layout.addLayout(layout)
 
 # =============================================================================
-# 4. ANA PENCERE
+# 3. ANA PENCERE
 # =============================================================================
 class CihazDetayPenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler
     def __init__(self, cihaz_id, yetki='viewer', kullanici_adi=None, ana_pencere=None):
         super().__init__()
         self.target_id = str(cihaz_id).strip()
@@ -257,7 +256,7 @@ class CihazDetayPenceresi(QWidget):
         self.kullanici_adi = kullanici_adi
         self.ana_pencere = ana_pencere
         
-        self.setWindowTitle(f"Cihaz Detay | {self.target_id}")
+        self.setWindowTitle(f"Cihaz Detay Kartı | {self.target_id}")
         self.resize(1200, 850)
         self.setStyleSheet("background-color: #121212;")
 
@@ -274,10 +273,7 @@ class CihazDetayPenceresi(QWidget):
         self.son_gelen_paket = None
 
         self.setup_ui()
-        
-        # 🟢 DEĞİŞİKLİK 2: Yetki
         YetkiYoneticisi.uygula(self, "cihaz_detay")
-        
         self.verileri_yukle_baslat()
 
     def setup_ui(self):
@@ -285,6 +281,7 @@ class CihazDetayPenceresi(QWidget):
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.setSpacing(0)
 
+        # HEADER (cihaz_ekle ile aynı stil)
         header = QFrame()
         header.setFixedHeight(60)
         header.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #333;")
@@ -305,6 +302,7 @@ class CihazDetayPenceresi(QWidget):
         h_layout.addWidget(self.progress)
         main_layout.addWidget(header)
 
+        # SCROLL AREA
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -313,6 +311,7 @@ class CihazDetayPenceresi(QWidget):
         content = QWidget()
         content.setStyleSheet("background: transparent;")
         
+        # GRID LAYOUT (3 Kolonlu Yapı)
         grid = QGridLayout(content)
         grid.setContentsMargins(25, 25, 25, 25)
         grid.setSpacing(25)
@@ -320,11 +319,11 @@ class CihazDetayPenceresi(QWidget):
         grid.setColumnStretch(1, 2)
         grid.setColumnStretch(2, 2)
 
-        # --- SOL KOLON ---
-        card_media = InfoCard("Cihaz Görseli")
-        self.lbl_resim = QLabel()
+        # --- SOL KOLON (Medya) ---
+        card_media = InfoCard("Medya & Dosyalar")
+        self.lbl_resim = QLabel("Yükleniyor...")
         self.lbl_resim.setFixedSize(250, 250)
-        self.lbl_resim.setStyleSheet("background-color: #000; border-radius: 8px; border: 1px solid #333;")
+        self.lbl_resim.setStyleSheet("background-color: #000; border-radius: 8px; border: 1px solid #333; color: #666;")
         self.lbl_resim.setScaledContents(True)
         self.lbl_resim.setAlignment(Qt.AlignCenter)
         card_media.add_widget(self.lbl_resim)
@@ -350,11 +349,11 @@ class CihazDetayPenceresi(QWidget):
         card_kimlik.add_layout(row2)
         
         self.add_modern_input(card_kimlik, "Kullanım Amacı", "Amaç", "combo", db_kodu="Amaç")
-        self.add_modern_input(card_kimlik, "Kaynak", "Kaynak", "combo", db_kodu="Kaynak")
+        self.add_modern_input(card_kimlik, "Edinim Kaynağı", "Kaynak", "combo", db_kodu="Kaynak")
         
         grid.addWidget(card_kimlik, 0, 1)
 
-        # --- SAĞ KOLON ---
+        # --- SAĞ KOLON (Lokasyon) ---
         card_lokasyon = InfoCard("Lokasyon ve Sorumluluk")
         row3 = QHBoxLayout(); row3.setSpacing(15)
         self.add_modern_input(row3, "Birim", "Birim", "combo", db_kodu="Birim", stretch=1)
@@ -367,6 +366,7 @@ class CihazDetayPenceresi(QWidget):
         card_lokasyon.add_layout(row4)
         grid.addWidget(card_lokasyon, 0, 2)
 
+        # --- ALT SATIR (Teknik & Lisans) ---
         card_teknik = InfoCard("Lisans ve Teknik Durum")
         t_grid = QGridLayout()
         t_grid.setSpacing(15)
@@ -390,7 +390,7 @@ class CihazDetayPenceresi(QWidget):
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
 
-        # ALT BUTONLAR
+        # FOOTER
         action_bar = QFrame()
         action_bar.setFixedHeight(80)
         action_bar.setStyleSheet("background-color: #1e1e1e; border-top: 1px solid #333;")
@@ -399,7 +399,7 @@ class CihazDetayPenceresi(QWidget):
         act_lay.setSpacing(15)
         
         self.btn_kapat = QPushButton("Vazgeç / Kapat")
-        self.btn_kapat.setObjectName("btn_kapat") # 🟢 DEĞİŞİKLİK 3: ObjectName
+        self.btn_kapat.setObjectName("btn_kapat")
         self.btn_kapat.setFixedSize(140, 45)
         self.btn_kapat.setCursor(Qt.PointingHandCursor)
         self.btn_kapat.setStyleSheet("""
@@ -409,7 +409,7 @@ class CihazDetayPenceresi(QWidget):
         self.btn_kapat.clicked.connect(self.kapat_veya_iptal)
         
         self.btn_duzenle = QPushButton("Bilgileri Düzenle")
-        self.btn_duzenle.setObjectName("btn_duzenle") # 🟢 DEĞİŞİKLİK 3: ObjectName
+        self.btn_duzenle.setObjectName("btn_duzenle")
         self.btn_duzenle.setFixedSize(160, 45)
         self.btn_duzenle.setCursor(Qt.PointingHandCursor)
         self.btn_duzenle.setEnabled(False)
@@ -421,7 +421,7 @@ class CihazDetayPenceresi(QWidget):
         self.btn_duzenle.clicked.connect(self.duzenleme_modunu_ac)
         
         self.btn_kaydet = QPushButton("Değişiklikleri Kaydet")
-        self.btn_kaydet.setObjectName("btn_kaydet") # 🟢 DEĞİŞİKLİK 3: ObjectName
+        self.btn_kaydet.setObjectName("btn_kaydet")
         self.btn_kaydet.setFixedSize(200, 45)
         self.btn_kaydet.setCursor(Qt.PointingHandCursor)
         self.btn_kaydet.setVisible(False)
@@ -437,6 +437,7 @@ class CihazDetayPenceresi(QWidget):
         act_lay.addWidget(self.btn_kaydet)
         main_layout.addWidget(action_bar)
 
+    # --- UI YARDIMCILARI ---
     def add_modern_input(self, parent, label, key, tip="text", db_kodu=None, stretch=0):
         widget = None
         if tip == "text": widget = QLineEdit()
@@ -447,10 +448,8 @@ class CihazDetayPenceresi(QWidget):
             
         grp = ModernInputGroup(label, widget)
         
-        if isinstance(parent, InfoCard): 
-            parent.add_widget(grp)
-        elif hasattr(parent, "addWidget"): 
-            parent.addWidget(grp, stretch) 
+        if isinstance(parent, InfoCard): parent.add_widget(grp)
+        elif hasattr(parent, "addWidget"): parent.addWidget(grp, stretch) 
             
         self.inputs[key] = widget
         return widget
