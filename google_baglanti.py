@@ -2,9 +2,13 @@
 import os
 import json
 import logging
+import socket
 import gspread
 from pathlib import Path
 from typing import Optional
+
+# PySide6 Sinyalleri için
+from PySide6.QtCore import QObject, Signal
 
 # Google Auth Kütüphaneleri
 from google.auth.transport.requests import Request
@@ -12,6 +16,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.auth.exceptions import TransportError, RefreshError
 
 # Loglama Ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,149 +27,258 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive'
 ]
 
-# --- AYARLARI JSON'DAN YÜKLEME ---
+# =============================================================================
+# 1. ÖZEL HATA SINIFLARI (Exception Classes)
+# =============================================================================
+class GoogleServisHatasi(Exception):
+    """Google servisleri ile ilgili genel hata."""
+    pass
+
+class InternetBaglantiHatasi(GoogleServisHatasi):
+    """İnternet bağlantısı yoksa fırlatılır."""
+    pass
+
+class KimlikDogrulamaHatasi(GoogleServisHatasi):
+    """Token/Credentials hatalarında fırlatılır."""
+    pass
+
+class VeritabaniBulunamadiHatasi(GoogleServisHatasi):
+    """Dosya veya Sayfa bulunamazsa fırlatılır."""
+    pass
+
+# =============================================================================
+# 2. HATA BİLDİRİM SİNYALCISI (Singleton)
+# =============================================================================
+class GoogleBaglantiSinyalleri(QObject):
+    """Backend hatalarını UI tarafına sinyal olarak göndermek için köprü."""
+    hata_olustu = Signal(str, str) # (Baslik, Mesaj)
+
+    _instance = None
+    @classmethod
+    def get_instance(cls):
+        if not cls._instance:
+            cls._instance = GoogleBaglantiSinyalleri()
+        return cls._instance
+
+# =============================================================================
+# 3. YARDIMCI ARAÇLAR
+# =============================================================================
 def db_ayarlarini_yukle():
     """ayarlar.json dosyasından veritabanı yapılandırmasını okur."""
-    # Bu dosyanın (google_baglanti.py) olduğu klasörü bulur
     mevcut_dizin = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(mevcut_dizin, 'ayarlar.json')
-    
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            # JSON içindeki "veritabani_yapisi" bölümünü döndürür
             return data.get("veritabani_yapisi", {})
     except Exception as e:
-        logger.error(f"ayarlar.json dosyası yüklenemedi: {e}")
+        logger.error(f"ayarlar.json okunamadı: {e}")
         return {}
+
+def internet_kontrol():
+    """Basit bir DNS sorgusu ile interneti kontrol eder."""
+    try:
+        # Google DNS'ine bağlanmayı dene
+        socket.create_connection(("8.8.8.8", 53), timeout=3)
+        return True
+    except OSError:
+        return False
 
 # Ayarları hafızaya al
 DB_CONFIG = db_ayarlarini_yukle()
 
 # =============================================================================
-# GOOGLE DRIVE SERVİSİ (DOSYA YÜKLEME İÇİN)
+# 4. KİMLİK DOĞRULAMA YÖNETİMİ
 # =============================================================================
-class GoogleDriveService:
-    def __init__(self):
-        self.creds = self._get_credentials()
-        self.service = build('drive', 'v3', credentials=self.creds)
+def _get_credentials():
+    """Kimlik doğrulama sürecini yönetir ve geçerli credentials döner."""
+    creds = None
+    token_path = 'token.json'
+    cred_path = 'credentials.json'
 
-    def _get_credentials(self):
-        creds = None
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-        
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                if not os.path.exists('credentials.json'):
-                    raise FileNotFoundError("credentials.json dosyası bulunamadı.")
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
-        return creds
-
-    def upload_file(self, file_path: str, parent_folder_id: str = None, custom_name: str = None) -> Optional[str]:
+    # 1. Token var mı kontrol et
+    if os.path.exists(token_path):
         try:
-            if not os.path.exists(file_path):
-                return None
-            path_obj = Path(file_path)
-            dosya_adi = custom_name if custom_name else path_obj.name
-            file_metadata = {'name': dosya_adi, 'parents': [parent_folder_id] if parent_folder_id else []}
-            media = MediaFileUpload(str(path_obj), resumable=True)
+            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        except Exception:
+            logger.warning("Token dosyası bozuk, yeniden oluşturulacak.")
+            creds = None
+    
+    # 2. Token geçersizse veya yoksa
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                if not internet_kontrol():
+                    raise InternetBaglantiHatasi("Token yenilemek için internet bağlantısı gerekli.")
+                creds.refresh(Request())
+            except (TransportError, RefreshError) as e:
+                logger.error(f"Token yenileme hatası: {e}")
+                raise KimlikDogrulamaHatasi("Oturum süresi doldu ve yenilenemedi. Lütfen tekrar giriş yapın.")
+        else:
+            if not os.path.exists(cred_path):
+                raise FileNotFoundError("credentials.json dosyası bulunamadı! Program dizinini kontrol edin.")
             
-            file = self.service.files().create(
-                body=file_metadata, media_body=media, fields='id, webViewLink'
-            ).execute()
-            
-            self.service.permissions().create(
-                fileId=file.get('id'), body={'role': 'reader', 'type': 'anyone'}
-            ).execute()
-            return file.get('webViewLink')
-        except Exception as e:
-            logger.error(f"Drive yükleme hatası: {e}")
-            return None
+            flow = InstalledAppFlow.from_client_secrets_file(cred_path, SCOPES)
+            # Local server açarak yetki iste
+            creds = flow.run_local_server(port=0)
+        
+        # 3. Yeni token'ı kaydet
+        with open(token_path, 'w') as token:
+            token.write(creds.to_json())
+
+    return creds
 
 # =============================================================================
-# GOOGLE SHEETS SERVİSİ
+# 5. GOOGLE SHEETS SERVİSİ
 # =============================================================================
 _sheets_client = None
 
 def _get_sheets_client():
     """Gspread istemcisini (client) tekil (singleton) olarak döndürür."""
     global _sheets_client
-    if not _sheets_client:
-        creds = None
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-        
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                 flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                 creds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
+    
+    # İnternet kontrolü (Performans için her çağrıda değil, sadece bağlantı yoksa yapılabilir ama burada güvenlik öncelikli)
+    if not internet_kontrol():
+         # UI'ya sinyal gönder
+        GoogleBaglantiSinyalleri.get_instance().hata_olustu.emit("Bağlantı Hatası", "İnternet bağlantısı algılanamadı.")
+        raise InternetBaglantiHatasi("İnternet bağlantısı yok.")
 
-        _sheets_client = gspread.authorize(creds)
+    if not _sheets_client:
+        try:
+            creds = _get_credentials()
+            _sheets_client = gspread.authorize(creds)
+        except Exception as e:
+            msg = f"Google Sheets yetkilendirme hatası: {str(e)}"
+            logger.error(msg)
+            raise KimlikDogrulamaHatasi(msg)
+            
     return _sheets_client
 
 def veritabani_getir(vt_tipi: str, sayfa_adi: str):
     """
-    Belirtilen veritabanı tipine ve sayfa adına göre Worksheet nesnesi döner.
-    Artık ayarlar.json dosyasındaki yapılandırmayı kullanır.
+    Belirtilen veritabanı ve sayfayı getirir. Hata durumunda Exception fırlatır.
     
     Args:
-        vt_tipi: 'personel', 'sabit', 'user' vb. (ayarlar.json içindeki anahtarlar)
-        sayfa_adi: Sayfanın (tab) adı (örn: 'user_login')
+        vt_tipi: ayarlar.json anahtarı ('personel', 'cihaz' vb.)
+        sayfa_adi: Sheet içindeki sekme adı
+    
+    Returns:
+        gspread.Worksheet: Başarılı ise worksheet nesnesi.
+        
+    Raises:
+        GoogleServisHatasi: Bağlantı sağlanamazsa.
     """
+    spreadsheet_name = None
+    
     try:
         client = _get_sheets_client()
         
-        # 1. ayarlar.json'dan dosya adını bul
+        # 1. Dosya adını bul
         if vt_tipi in DB_CONFIG:
             spreadsheet_name = DB_CONFIG[vt_tipi]["dosya"]
         else:
-            # Eğer json'da yoksa eski usul yedek (hardcoded) harita
+            # Yedek harita (Config bozuksa)
             db_map = {
                 'personel': 'itf_personel_vt',
                 'sabit':    'itf_sabit_vt',
                 'cihaz':    'itf_cihaz_vt',
-                'user':     'itf_user_vt'
+                'user':     'itf_user_vt',
+                'rke':      'itf_rke_vt'
             }
             spreadsheet_name = db_map.get(vt_tipi)
             
         if not spreadsheet_name:
-            logger.error(f"'{vt_tipi}' tipi için ayarlar.json içinde tanım bulunamadı.")
-            return None
+            raise ValueError(f"'{vt_tipi}' için veritabanı tanımı bulunamadı.")
 
-        # 2. Google Sheet dosyasını açmayı dene
+        # 2. Dosyayı Aç
         try:
             sh = client.open(spreadsheet_name)
         except gspread.SpreadsheetNotFound:
-            logger.error(f"Spreadsheet '{spreadsheet_name}' bulunamadı. Lütfen dosya adını ve paylaşım yetkilerini kontrol edin.")
-            return None
+            raise VeritabaniBulunamadiHatasi(f"'{spreadsheet_name}' isimli Google Sheet dosyası bulunamadı (Yetkiniz olmayabilir).")
 
-        # 3. İstenen sayfayı (Worksheet) aç
-        ws = sh.worksheet(sayfa_adi)
-        return ws
-        
-    except gspread.WorksheetNotFound:
-        logger.error(f"'{spreadsheet_name}' dosyası içinde '{sayfa_adi}' isimli bir sayfa bulunamadı.")
-        return None
+        # 3. Sayfayı (Tab) Aç
+        try:
+            ws = sh.worksheet(sayfa_adi)
+            return ws
+        except gspread.WorksheetNotFound:
+            raise VeritabaniBulunamadiHatasi(f"'{spreadsheet_name}' içinde '{sayfa_adi}' sayfası bulunamadı.")
+
     except Exception as e:
-        logger.error(f"Veritabanı bağlantı hatası ({vt_tipi}/{sayfa_adi}): {e}")
-        return None
+        error_msg = str(e)
+        logger.error(f"Veritabanı Hatası ({vt_tipi}/{sayfa_adi}): {error_msg}")
+        
+        # UI'ya sinyal gönder (Opsiyonel: Kullanıcıya popup açılmasını tetikler)
+        # Eğer bu fonksiyon bir Thread içinde çağrılıyorsa, Thread zaten exception'ı yakalayacaktır.
+        # Ancak yine de global loga düşürmek iyidir.
+        if "internet" in error_msg.lower():
+             raise InternetBaglantiHatasi("İnternet bağlantısı koptu.")
+        
+        # Orijinal hatayı yukarı fırlat ki çağıran form (ör: CihazEkle) bunu yakalasın
+        raise e 
+
+# =============================================================================
+# 6. GOOGLE DRIVE SERVİSİ
+# =============================================================================
+class GoogleDriveService:
+    def __init__(self):
+        try:
+            self.creds = _get_credentials()
+            self.service = build('drive', 'v3', credentials=self.creds)
+        except Exception as e:
+            logger.error(f"Drive servisi başlatılamadı: {e}")
+            raise GoogleServisHatasi(f"Drive bağlantı hatası: {e}")
+
+    def upload_file(self, file_path: str, parent_folder_id: str = None, custom_name: str = None) -> Optional[str]:
+        """Dosyayı Drive'a yükler ve link döner. Hata olursa None dönmez, hata fırlatır."""
+        if not os.path.exists(file_path):
+            logger.warning(f"Yüklenecek dosya bulunamadı: {file_path}")
+            return None # Dosya yoksa None dönmesi mantıklı, sistem hatası değil.
+
+        try:
+            path_obj = Path(file_path)
+            dosya_adi = custom_name if custom_name else path_obj.name
+            
+            file_metadata = {
+                'name': dosya_adi, 
+                'parents': [parent_folder_id] if parent_folder_id else []
+            }
+            
+            media = MediaFileUpload(str(path_obj), resumable=True)
+            
+            # Yükleme işlemi
+            file = self.service.files().create(
+                body=file_metadata, 
+                media_body=media, 
+                fields='id, webViewLink'
+            ).execute()
+            
+            # Herkese okuma izni ver (Opsiyonel, güvenlik politikasına göre değişir)
+            self.service.permissions().create(
+                fileId=file.get('id'), 
+                body={'role': 'reader', 'type': 'anyone'}
+            ).execute()
+            
+            return file.get('webViewLink')
+
+        except Exception as e:
+            logger.error(f"Drive yükleme hatası: {e}")
+            if not internet_kontrol():
+                raise InternetBaglantiHatasi("Dosya yüklenirken internet bağlantısı kesildi.")
+            raise GoogleServisHatasi(f"Dosya yüklenemedi: {e}")
 
 if __name__ == "__main__":
-    # Basit Bağlantı Testi
-    print("Bağlantı testi yapılıyor...")
-    ws = veritabani_getir('user', 'user_login')
-    if ws:
-        print("BAŞARILI! Veriler çekildi:")
-        print(ws.get_all_records())
-    else:
-        print("BAŞARISIZ! Lütfen yukarıdaki hata mesajlarını okuyun.")
+    # Test Bloğu
+    print("--- Bağlantı Testi ---")
+    try:
+        if internet_kontrol():
+            print("✅ İnternet: VAR")
+        else:
+            print("❌ İnternet: YOK")
+            
+        print("Spreadsheet bağlantısı deneniyor...")
+        ws = veritabani_getir('user', 'user_login')
+        print(f"✅ Başarılı! Kayıt sayısı: {len(ws.get_all_values())}")
+        
+    except Exception as hata:
+        print(f"❌ HATA YAKALANDI: {type(hata).__name__}")
+        print(f"Mesaj: {hata}")

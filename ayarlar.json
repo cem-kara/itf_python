@@ -45,5 +45,31 @@
                 "Tatiller"
             ]
         }
-    }
+    },
+  "menu_yapilandirma": {
+    "GENEL": [
+      {"baslik": "Dashboard", "modul": "formlar.dashboard", "sinif": "DashboardPenceresi"},
+      {"baslik": "Ayarlar", "modul": "formlar.ayarlar", "sinif": "AyarlarPenceresi"}
+    ],
+    "PERSONEL": [
+      {"baslik": "Personel Listesi", "modul": "formlar.personel_listesi", "sinif": "PersonelListesiPenceresi"},
+      {"baslik": "Personel Ekle", "modul": "formlar.personel_ekle", "sinif": "PersonelEklePenceresi"},
+      {"baslik": "İzin Takip", "modul": "formlar.izin_takip", "sinif": "IzinGirisPenceresi"},
+      {"baslik": "FHSZ Yönetim", "modul": "formlar.fhsz_Yonetim", "sinif": "FHSZYonetimPaneli"},
+      {"baslik": "Personel Verileri", "modul": "formlar.user_dashboard", "sinif": "DashboardWidget"}
+    ],
+    "CİHAZ": [
+      {"baslik": "Cihaz Listesi", "modul": "formlar.cihaz_listesi", "sinif": "CihazListesiPenceresi"},
+      {"baslik": "Cihaz Ekle", "modul": "formlar.cihaz_ekle", "sinif": "CihazEklePenceresi"},
+      {"baslik": "Ariza Kaydi", "modul": "formlar.ariza_kayit", "sinif": "ArizaKayitPenceresi"},
+      {"baslik": "Ariza Listesi", "modul": "formlar.ariza_listesi", "sinif": "ArizaListesiPenceresi"},
+      {"baslik": "Periyodik Bakim", "modul": "formlar.periyodik_bakim", "sinif": "PeriyodikBakimPenceresi"},
+      {"baslik": "Kalibrasyon Takip", "modul": "formlar.kalibrasyon_ekle", "sinif": "KalibrasyonEklePenceresi"}
+    ],
+    "RKE": [
+      {"baslik": "RKE Listesi", "modul": "formlar.rke_yonetim", "sinif": "RKEYonetimPenceresi"},
+      {"baslik": "Muayene Girişi", "modul": "formlar.rke_muayene", "sinif": "RKEMuayenePenceresi"},
+      {"baslik": "RKE Raporlama", "modul": "formlar.rke_rapor", "sinif": "RKERaporPenceresi"}
+    ]
+  }
 }
