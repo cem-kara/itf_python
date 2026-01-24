@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 
+
 class GuvenlikAraclari:
     @staticmethod
     def sifrele(sifre):
@@ -8,7 +9,6 @@ class GuvenlikAraclari:
         Verilen şifreyi SHA-256 algoritması ile hashler.
         """
         if not sifre: return ""
-        
         # Şifreyi byte'a çevir
         sifre_bytes = str(sifre).encode('utf-8')
         
