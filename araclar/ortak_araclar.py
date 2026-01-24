@@ -1,28 +1,30 @@
 # -*- coding: utf-8 -*-
 """
 Tüm formlar tarafından kullanılan ortak fonksiyonlar ve araçlar.
-KIDEMLİ PYTHON ASİSTANI TARAFINDAN REFACTOR EDİLMİŞTİR.
+Kod tekrarını azaltmak ve bakım kolaylığı sağlamak için merkezi bir modül.
+Hem eski (fonksiyonel) hem de yeni (sınıf tabanlı) yapıyı destekler.
 """
 
 import logging
-import re
+import sys
+import os
 from typing import Dict, List, Any
 
 # PySide6 Kütüphaneleri
 from PySide6.QtWidgets import (
     QWidget, QGroupBox, QFormLayout, QLineEdit, QComboBox, 
     QDateEdit, QMessageBox, QMdiSubWindow, QVBoxLayout, 
-    QTableWidget, QHeaderView, QPushButton, QLabel, 
-    QMdiArea, QFrame, QGraphicsDropShadowEffect, QAbstractItemView
+    QTableWidget, QHeaderView, QPushButton,
+    QLabel, QHBoxLayout, QAbstractItemView, QMdiArea
 )
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QIntValidator, QColor
+from PySide6.QtGui import QIntValidator
 
 # Loglama Ayarı
 logger = logging.getLogger("OrtakAraclar")
 
 # ============================================================================
-# 1. PENCERE VE MDI YÖNETİMİ
+# 1. PENCERE YÖNETİMİ
 # ============================================================================
 
 def pencereyi_kapat(widget_self):
@@ -57,122 +59,23 @@ def mdi_pencere_ac(mevcut_widget, hedef_form, baslik):
             break
         parent = parent.parent()
     
+    # Formun başlığını ayarla
     hedef_form.setWindowTitle(baslik)
 
     if mdi_area:
-        # Form zaten açıksa onu öne getir
-        for sub in mdi_area.subWindowList():
-            if sub.widget() and sub.widget().__class__.__name__ == hedef_form.__class__.__name__:
-                 mdi_area.setActiveSubWindow(sub)
-                 return
-        # MDI içine ekle
+        # Form zaten açıksa onu öne getir (Opsiyonel)
+        # for sub in mdi_area.subWindowList():
+        #     if sub.widget().__class__.__name__ == hedef_form.__class__.__name__:
+        #          mdi_area.setActiveSubWindow(sub)
+        #          return
+
         sub = mdi_area.addSubWindow(hedef_form)
         sub.showMaximized()
     else:
-        # MDI bulunamazsa normal aç
         hedef_form.show()
 
 # ============================================================================
-# 2. UI BİLEŞENLERİ (MODERN & KLASİK)
-# ============================================================================
-
-class OrtakAraclar:
-    """Merkezi UI Factory Sınıfı"""
-
-    @staticmethod
-    def create_modern_input(parent, label_text, widget, stretch=0):
-        """
-        Modern etiketli giriş grubu oluşturur (Cihaz Ekle formundaki yapı).
-        """
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0,0,0,0)
-        layout.setSpacing(4)
-        
-        lbl = QLabel(label_text)
-        # Stil tema.py'dan gelmeli ama default override için burada tutuyoruz (minimal)
-        lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
-        
-        widget.setMinimumHeight(35)
-        # Not: Widget stili tema.py tarafından yönetilmelidir.
-        
-        layout.addWidget(lbl)
-        layout.addWidget(widget)
-        
-        if hasattr(parent, "addWidget"): # Layout ise
-            parent.addWidget(container, stretch)
-        elif hasattr(parent, "add_widget"): # InfoCard ise
-            parent.add_widget(container)
-            
-        return container
-
-    @staticmethod
-    def create_info_card(title: str, parent=None):
-        """Bilgi Kartı (InfoCard) oluşturur."""
-        card = QFrame(parent)
-        card.setObjectName("InfoCard") # CSS seçicisi için ID
-        
-        # Gölge Efekti
-        shadow = QGraphicsDropShadowEffect(card)
-        shadow.setBlurRadius(20)
-        shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        card.setGraphicsEffect(shadow)
-        
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
-        
-        if title:
-            lbl_title = QLabel(title)
-            lbl_title.setObjectName("CardTitle")
-            lbl_title.setStyleSheet("color: #4dabf7; font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 5px;")
-            layout.addWidget(lbl_title)
-            
-        # Dinamik ekleme metodları ekle
-        card.add_widget = layout.addWidget
-        card.add_layout = layout.addLayout
-        
-        return card
-
-    @staticmethod
-    def create_line_edit(parent=None, placeholder="", is_password=False, only_int=False):
-        inp = QLineEdit(parent)
-        inp.setPlaceholderText(placeholder)
-        if is_password: inp.setEchoMode(QLineEdit.Password)
-        if only_int: inp.setValidator(QIntValidator())
-        return inp
-
-    @staticmethod
-    def create_combo_box(parent=None, items=None, db_kodu=None):
-        combo = QComboBox(parent)
-        if items: combo.addItems(items)
-        if db_kodu: combo.setProperty("db_kodu", db_kodu)
-        return combo
-        
-    @staticmethod
-    def create_date_edit(parent=None):
-        dt = QDateEdit(parent)
-        dt.setCalendarPopup(True)
-        dt.setDisplayFormat("dd.MM.yyyy")
-        dt.setDate(QDate.currentDate())
-        return dt
-
-    @staticmethod
-    def create_table(parent, headers):
-        table = QTableWidget(parent)
-        table.setColumnCount(len(headers))
-        table.setHorizontalHeaderLabels(headers)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        table.setAlternatingRowColors(True)
-        table.setShowGrid(False) 
-        return table
-
-# ============================================================================
-# 3. VERITABANI VE VERİ İŞLEME YARDIMCILARI
+# 2. VERITABANI İŞLEMLERİ (HELPERS)
 # ============================================================================
 
 def sabitler_yukle(veritabani_getir_func) -> Dict[str, List[str]]:
@@ -189,7 +92,10 @@ def sabitler_yukle(veritabani_getir_func) -> Dict[str, List[str]]:
                     if kod not in sabitler:
                         sabitler[kod] = []
                     sabitler[kod].append(eleman)
-            for k in sabitler: sabitler[k].sort()
+            
+            for k in sabitler:
+                sabitler[k].sort()
+                
     except Exception as e:
         logger.error(f"Sabitler yüklenirken hata: {e}")
     return sabitler
@@ -211,13 +117,122 @@ def satir_ekle(veritabani_getir_func, vt_tipi: str, sayfa_adi: str, veri_listesi
         if ws:
             ws.append_row(veri_listesi)
             return True
-        logger.error("Veritabanı bağlantısı (ws) kurulamadı.")
+        else:
+             logger.error("Veritabanı bağlantısı (ws) kurulamadı.")
+             return False
     except Exception as e:
         logger.error(f"Satır ekleme hatası ({sayfa_adi}): {e}")
     return False
 
 # ============================================================================
-# 4. DOĞRULAMA VE MESAJLAR
+# 3. ESKİ UI BİLEŞEN OLUŞTURUCU (Fonksiyonel Yapı - Geriye Dönük Uyumluluk)
+# ============================================================================
+
+def create_group_box(title: str, renk: str = None) -> QGroupBox:
+    grp = QGroupBox(title)
+    if renk:
+        grp.setStyleSheet(f"QGroupBox::title {{ color: {renk}; }}")
+    return grp
+
+def create_form_layout() -> QFormLayout:
+    layout = QFormLayout()
+    layout.setSpacing(15)
+    layout.setContentsMargins(15, 20, 15, 15)
+    return layout
+
+def add_line_edit(layout, label_text: str, placeholder: str = "", default_text: str = "", 
+                  max_length: int = None, only_int: bool = False, is_password: bool = False) -> QLineEdit:
+    line_edit = QLineEdit()
+    line_edit.setPlaceholderText(placeholder)
+    line_edit.setText(str(default_text))
+    if max_length: line_edit.setMaxLength(max_length)
+    if only_int: line_edit.setValidator(QIntValidator())
+    if is_password: line_edit.setEchoMode(QLineEdit.Password)
+    layout.addRow(label_text, line_edit)
+    return line_edit
+
+def add_combo_box(layout: QFormLayout, label_text: str, items: List[str] = None) -> QComboBox:
+    combo = QComboBox()
+    combo.setMinimumHeight(35)
+    if items: combo.addItems(items)
+    layout.addRow(QLabel(label_text), combo)
+    return combo
+
+def add_date_edit(layout: QFormLayout, label_text: str, default_date: QDate = None) -> QDateEdit:
+    date_edit = QDateEdit()
+    date_edit.setCalendarPopup(True)
+    if default_date: date_edit.setDate(default_date)
+    else: date_edit.setDate(QDate.currentDate())
+    date_edit.setDisplayFormat("dd.MM.yyyy")
+    date_edit.setMinimumHeight(35)
+    layout.addRow(QLabel(label_text), date_edit)
+    return date_edit
+
+# ============================================================================
+# 4. YENİ SINIF YAPISI (OrtakAraclar Class) - PersonelEkle vb. için
+# ============================================================================
+
+class OrtakAraclar:
+    """Yeni modüler formlar için merkezi araç seti."""
+
+    @staticmethod
+    def create_group_box(parent, title):
+        gb = QGroupBox(title, parent)
+        gb.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #555; margin-top: 10px; border-radius: 5px; } "
+                         "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #4dabf7; }")
+        return gb
+
+    @staticmethod
+    def create_combo_box(parent, items=None):
+        combo = QComboBox(parent)
+        if items: combo.addItems(items)
+        combo.setStyleSheet("QComboBox { padding: 5px; border: 1px solid #555; background-color: #2b2b2b; color: white; border-radius: 3px; } "
+                            "QComboBox::drop-down { border: 0px; }")
+        return combo
+
+    @staticmethod
+    def create_line_edit(parent, placeholder=""):
+        inp = QLineEdit(parent)
+        inp.setPlaceholderText(placeholder)
+        inp.setStyleSheet("QLineEdit { padding: 5px; border: 1px solid #555; background-color: #2b2b2b; color: white; border-radius: 3px; }")
+        return inp
+
+    @staticmethod
+    def create_button(parent, text, slot=None):
+        btn = QPushButton(text, parent)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet("""
+            QPushButton { background-color: #1976d2; color: white; padding: 6px 15px; border-radius: 4px; font-weight: bold; border: none; }
+            QPushButton:hover { background-color: #1565c0; }
+            QPushButton:pressed { background-color: #0d47a1; }
+        """)
+        if slot: btn.clicked.connect(slot)
+        return btn
+
+    @staticmethod
+    def create_table(parent, headers):
+        table = QTableWidget(parent)
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False) 
+        table.setStyleSheet("""
+            QTableWidget { border: 1px solid #444; background-color: #1e1e1e; gridline-color: #333; }
+            QHeaderView::section { background-color: #333; color: white; padding: 5px; border: none; font-weight: bold; }
+            QTableWidget::item { padding: 5px; color: #ddd; }
+            QTableWidget::item:selected { background-color: #1976d2; color: white; }
+        """)
+        return table
+    
+    @staticmethod
+    def mdi_pencere_ac(current_widget, target_form, title):
+        mdi_pencere_ac(current_widget, target_form, title)
+
+# ============================================================================
+# 5. MESAJ KUTULARI VE DOĞRULAMA
 # ============================================================================
 
 def show_info(title: str, message: str, parent=None):
@@ -229,27 +244,34 @@ def show_warning(title: str, message: str, parent=None):
 def show_error(title: str, message: str, parent=None):
     QMessageBox.critical(parent, title, message)
 
+# EKLENEN FONKSİYON: show_question
 def show_question(title: str, message: str, parent=None) -> bool:
+    """Evet/Hayır sorusu sorar. Evet ise True döner."""
     reply = QMessageBox.question(parent, title, message, 
                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
     return reply == QMessageBox.Yes
 
-def validate_required_fields(fields_list: List[QWidget]) -> bool:
-    """Liste formatındaki widget'ların doluluğunu kontrol eder."""
-    for widget in fields_list:
-        if isinstance(widget, QLineEdit):
-            if not widget.text().strip():
-                show_warning("Eksik Bilgi", "Lütfen zorunlu alanları doldurunuz.")
-                widget.setFocus()
-                return False
-        elif isinstance(widget, QComboBox):
-            if widget.currentIndex() == -1 or not widget.currentText():
-                show_warning("Eksik Bilgi", "Lütfen bir seçim yapınız.")
-                widget.setFocus()
-                return False
-    return True
+def validate_required_fields(fields_dict_or_list: Any) -> bool:
+    """Hem sözlük (eski) hem liste (yeni) formatını destekler."""
+    if isinstance(fields_dict_or_list, list):
+        for widget in fields_dict_or_list:
+            if isinstance(widget, QLineEdit):
+                if not widget.text().strip():
+                    show_warning("Eksik Bilgi", f"Lütfen zorunlu alanları doldurunuz.\n(Boş alan: {widget.placeholderText() or 'Belirtilmemiş'})")
+                    widget.setFocus()
+                    return False
+            elif isinstance(widget, QComboBox):
+                if widget.currentIndex() == -1 or not widget.currentText() or widget.currentText() == "Seçiniz...":
+                    show_warning("Eksik Bilgi", "Lütfen bir seçim yapınız.")
+                    widget.setFocus()
+                    return False
+        return True
 
-# Eski fonksiyonlar (uyumluluk için tutulabilir veya silinebilir)
-create_group_box = OrtakAraclar.create_modern_input # Geçici mapping
-create_form_layout = lambda: QFormLayout() 
-add_line_edit = OrtakAraclar.create_line_edit
+    elif isinstance(fields_dict_or_list, dict):
+        for field_name, value in fields_dict_or_list.items():
+            if not value or str(value).strip() == "":
+                show_warning("Eksik Bilgi", f"Lütfen '{field_name}' alanını doldurunuz.")
+                return False
+        return True
+    
+    return True
