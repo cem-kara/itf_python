@@ -4,9 +4,13 @@ import os
 import logging
 import pandas as pd
 
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                               QTableView, QHeaderView, QLineEdit, QPushButton, 
-                               QLabel, QProgressBar, QAbstractItemView, QComboBox, QFrame)
+# PySide6 Kütüphaneleri
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
+    QTableView, QHeaderView, QLineEdit, QPushButton, 
+    QLabel, QProgressBar, QAbstractItemView, QComboBox, QFrame,
+    QGroupBox, QSizePolicy
+)
 from PySide6.QtCore import Qt, QThread, Signal, QAbstractTableModel
 
 # --- LOGLAMA ---
@@ -19,20 +23,27 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir
     from araclar.ortak_araclar import show_error, mdi_pencere_ac
 except ImportError as e:
     print(f"Modül Hatası: {e}")
+    # Fallback tanımlar
     def veritabani_getir(vt_tipi, sayfa_adi): return None
     def show_error(t, m, p): print(m)
     def mdi_pencere_ac(parent, form, title): form.show()
+    class YetkiYoneticisi:
+        @staticmethod
+        def uygula(self, kod): pass
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # =============================================================================
-# 1. PANDAS VERİ MODELİ (AYNEN KORUNDU)
+# 1. PANDAS VERİ MODELİ (KORUNDU)
 # =============================================================================
 class PandasModel(QAbstractTableModel):
     def __init__(self, data=pd.DataFrame()):
@@ -60,7 +71,7 @@ class PandasModel(QAbstractTableModel):
         return None
 
 # =============================================================================
-# 2. ARKA PLAN İŞÇİSİ
+# 2. ARKA PLAN İŞÇİSİ (KORUNDU)
 # =============================================================================
 class VeriYukleyici(QThread):
     veri_geldi = Signal(object, dict) # DataFrame, Sabitler Sözlüğü
@@ -80,13 +91,13 @@ class VeriYukleyici(QThread):
                     headers = [str(h).strip() for h in data[0]]
                     rows = data[1:]
                     df = pd.DataFrame(rows, columns=headers)
-                    df = df.fillna("") # NaN temizliği
+                    df = df.fillna("") 
                     
                     # İstenen Sütunları Filtrele
                     istenen_sutunlar = [
                         "cihaz_id", "Marka", "Model", "Kaynak", 
                         "SeriNo", "NDKLisansNo", "LisansDurum", 
-                        "AnaBilimDali", "BulunduguBina", "CihazID" # Alternatif ID
+                        "AnaBilimDali", "BulunduguBina", "CihazID"
                     ]
                     # Sadece mevcut olanları al
                     mevcut = [c for c in istenen_sutunlar if c in df.columns]
@@ -122,7 +133,6 @@ class VeriYukleyici(QThread):
 # 3. GÖRÜNÜM (UI)
 # =============================================================================
 class CihazListesiPenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -136,7 +146,7 @@ class CihazListesiPenceresi(QWidget):
         
         self.setup_ui()
         
-        # 🟢 DEĞİŞİKLİK 2: Yetki
+        # Yetki Uygula
         YetkiYoneticisi.uygula(self, "cihaz_listesi")
         
         self.verileri_yenile()
@@ -144,13 +154,12 @@ class CihazListesiPenceresi(QWidget):
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
         
-        # --- ÜST BAR ---
-        top_frame = QFrame()
-        top_frame.setStyleSheet("background-color: #2b2b2b; border-radius: 6px;")
-        top_layout = QHBoxLayout(top_frame)
+        # --- ÜST BAR (GROUPBOX OLARAK DÜZENLENDİ) ---
+        grp_filtre = QGroupBox("Filtreleme ve İşlemler")
+        # Dikeyde sadece gerektiği kadar yer kaplasın
+        grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         
-        lbl_baslik = QLabel("Envanter")
-        lbl_baslik.setStyleSheet("font-size: 16px; font-weight: bold; color: #4dabf7;")
+        top_layout = QHBoxLayout(grp_filtre)
         
         self.combo_abd = QComboBox()
         self.combo_abd.addItem("Tümü")
@@ -164,24 +173,23 @@ class CihazListesiPenceresi(QWidget):
 
         self.txt_ara = QLineEdit()
         self.txt_ara.setPlaceholderText("Ara...")
-        self.txt_ara.setStyleSheet("padding: 5px; background: #1e1e1e; color: white; border: 1px solid #555;")
         self.txt_ara.textChanged.connect(self.filtre_uygula)
         
         # Yenile Butonu
         self.btn_yenile = QPushButton("⟳")
-        self.btn_yenile.setObjectName("btn_yenile") # Yetki için
-        self.btn_yenile.setFixedSize(30, 30)
+        self.btn_yenile.setObjectName("btn_yenile")
+        self.btn_yenile.setFixedHeight(30)
+        self.btn_yenile.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; padding: 0 10px;")
         self.btn_yenile.clicked.connect(self.verileri_yenile)
         
-        # Yeni Ekle Butonu (Eğer ana menü dışında buradan da eklenmek istenirse)
+        # Yeni Ekle Butonu
         self.btn_yeni_ekle = QPushButton(" + Yeni Cihaz")
-        self.btn_yeni_ekle.setObjectName("btn_yeni") # Yetki için
+        self.btn_yeni_ekle.setObjectName("btn_yeni")
         self.btn_yeni_ekle.setFixedHeight(30)
         self.btn_yeni_ekle.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; padding: 0 10px;")
         self.btn_yeni_ekle.clicked.connect(self.yeni_cihaz_ekle)
 
-        top_layout.addWidget(lbl_baslik)
-        top_layout.addWidget(QLabel("| Birim:"))
+        top_layout.addWidget(QLabel("Birim:"))
         top_layout.addWidget(self.combo_abd)
         top_layout.addWidget(QLabel("Kaynak:"))
         top_layout.addWidget(self.combo_kaynak)
@@ -189,21 +197,21 @@ class CihazListesiPenceresi(QWidget):
         top_layout.addWidget(self.txt_ara)
         top_layout.addWidget(self.btn_yeni_ekle)
         top_layout.addWidget(self.btn_yenile)
-        main_layout.addWidget(top_frame)
+        
+        main_layout.addWidget(grp_filtre)
         
         # --- PROGRESS ---
         self.progress = QProgressBar()
         self.progress.setVisible(False)
-        self.progress.setStyleSheet("height: 4px; background: #333; border: none;")
+        self.progress.setStyleSheet("height: 4px; background: #333; border: none;") 
         main_layout.addWidget(self.progress)
 
-        # --- TABLO ---
+        # --- TABLO (QTableView KORUNDU) ---
         self.tablo = QTableView()
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tablo.setSortingEnabled(True)
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tablo.doubleClicked.connect(self.satir_tiklandi)
-        self.tablo.setStyleSheet("QTableView { border: 1px solid #444; selection-background-color: #0078d4; }")
         main_layout.addWidget(self.tablo)
         
         self.lbl_info = QLabel("Hazır")
@@ -224,7 +232,6 @@ class CihazListesiPenceresi(QWidget):
         self.progress.setVisible(False)
         self.full_df = df
         
-        # Comboboxları doldur (Sinyalleri kapatıp açarak)
         self.combo_abd.blockSignals(True)
         self.combo_kaynak.blockSignals(True)
         
@@ -257,19 +264,18 @@ class CihazListesiPenceresi(QWidget):
         abd = self.combo_abd.currentText()
         kaynak = self.combo_kaynak.currentText()
         
-        # 1. Combobox Filtreleri
         if abd != "Tümü" and "AnaBilimDali" in df.columns:
             df = df[df["AnaBilimDali"].astype(str) == abd]
             
         if kaynak != "Tümü" and "Kaynak" in df.columns:
             df = df[df["Kaynak"].astype(str) == kaynak]
             
-        # 2. Metin Arama
         if text:
             mask = df.astype(str).apply(lambda x: x.str.lower().str.contains(text, na=False)).any(axis=1)
             df = df[mask]
             
         self.filtered_df = df
+        # PandasModel Kullanımı KORUNDU
         model = PandasModel(df)
         self.tablo.setModel(model)
         self.lbl_info.setText(f"Gösterilen: {len(df)}")
@@ -282,13 +288,18 @@ class CihazListesiPenceresi(QWidget):
     def satir_tiklandi(self, index):
         try:
             row = index.row()
-            # ID sütununu bul (cihaz_id veya CihazID)
             col_name = "cihaz_id" if "cihaz_id" in self.filtered_df.columns else "CihazID"
             
             if col_name in self.filtered_df.columns:
-                val = str(self.filtered_df.iloc[row][col_name])
+                # ESKİ KOD (Hata veren):
+                # val = str(self.filtered_df.iloc[row][self.filtered_df.columns.get_loc(col_name)])
+                
+                # YENİ KOD (Düzeltilmiş):
+                # DataFrame üzerinde doğrudan iloc[row, col] kullanımı
+                col_index = self.filtered_df.columns.get_loc(col_name)
+                val = str(self.filtered_df.iloc[row, col_index])
             else:
-                # Sütun yoksa ilk sütunu al
+                # Sütun yoksa ilk sütunu al (Burada da aynı mantıkla düzeltme yapılabilir)
                 val = str(self.filtered_df.iloc[row, 0])
                 
             self.detay_ac(val)
@@ -297,9 +308,7 @@ class CihazListesiPenceresi(QWidget):
 
     def detay_ac(self, cihaz_id):
         try:
-            # 🟢 DİNAMİK İMPORT (Döngüsel importu önlemek için)
             from formlar.cihaz_detay import CihazDetayPenceresi
-            # Yetki ve kullanıcı adını ilet
             detay = CihazDetayPenceresi(cihaz_id, self.yetki, self.kullanici_adi)
             mdi_pencere_ac(self, detay, f"Cihaz Detay: {cihaz_id}")
         except ImportError:
@@ -315,7 +324,6 @@ class CihazListesiPenceresi(QWidget):
         except ImportError:
             show_error("Modül Eksik", "Cihaz ekleme modülü bulunamadı.", self)
 
-    # 🟢 DEĞİŞİKLİK 3: Thread Güvenliği
     def closeEvent(self, event):
         if hasattr(self, 'worker') and self.worker.isRunning():
             self.worker.quit()
@@ -324,8 +332,14 @@ class CihazListesiPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    from temalar.tema import TemaYonetimi
-    TemaYonetimi.uygula_fusion_dark(app)
+    
+    # Tema uygulaması eklendi
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
+        app.setStyle("Fusion")
+        
     win = CihazListesiPenceresi()
     win.show()
     sys.exit(app.exec())

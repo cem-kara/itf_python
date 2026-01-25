@@ -11,7 +11,8 @@ from PySide6.QtGui import QPixmap, QCursor, QFont, QColor
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton, 
                                QScrollArea, QFrame, QFileDialog, QGridLayout, 
-                               QProgressBar, QGraphicsDropShadowEffect, QSizePolicy)
+                               QProgressBar, QGraphicsDropShadowEffect, QSizePolicy,
+                               QGroupBox)
 
 # --- LOGLAMA ---
 logging.basicConfig(level=logging.INFO)
@@ -23,20 +24,25 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
+    
     from google_baglanti import veritabani_getir, GoogleDriveService
     from araclar.ortak_araclar import show_info, show_error, pencereyi_kapat
 except ImportError as e:
     print(f"Modül Hatası: {e}")
+    # Fallback
     def veritabani_getir(vt, sayfa): return None
     def show_info(t, m, p): print(m)
     def show_error(t, m, p): print(m)
     def pencereyi_kapat(w): w.close()
     class GoogleDriveService:
         def upload_file(self, a, b): return None
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # Künye Motoru (Varsa)
 try:
@@ -52,7 +58,7 @@ DRIVE_KLASORLERI = {
 }
 
 # =============================================================================
-# 1. THREAD SINIFLARI (MANTIK)
+# 1. THREAD SINIFLARI (MANTIK KORUNDU)
 # =============================================================================
 class BaslangicYukleyici(QThread):
     # (Sabitler, Kısaltma Haritaları, Son Sıra No)
@@ -96,7 +102,6 @@ class BaslangicYukleyici(QThread):
                         for row in data[1:]:
                             if len(row) > id_idx:
                                 val = str(row[id_idx]).strip()
-                                # Sadece sayıları al (RAD-MR-001 -> 1)
                                 try:
                                     num_str = ''.join(filter(str.isdigit, val))
                                     if num_str:
@@ -184,49 +189,45 @@ class ModernInputGroup(QWidget):
         self.widget.setMinimumHeight(40)
         self.widget.setMinimumWidth(150)
         
-        self.widget.setStyleSheet("""
-            QLineEdit, QComboBox, QDateEdit {
-                background-color: #2b2b2b;
-                border: 1px solid #3a3a3a;
-                border-radius: 6px;
-                padding: 6px;
-                color: #e0e0e0;
-                font-size: 14px;
-                min-height: 18px;
-            }
-            QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
-                border: 1px solid #4dabf7;
-                background-color: #333333;
-            }
-            QLineEdit:read-only {
-                background-color: #202020;
-                border: none;
-                color: #999;
-                font-style: italic;
-            }
-        """)
+        if widget: widget.setObjectName(f"inp_{label_text.replace(' ', '_')}")
+            
         layout.addWidget(self.lbl)
         layout.addWidget(self.widget)
 
-class InfoCard(QFrame):
+class InfoCard(QGroupBox):
+    """
+    Görsel gruplama sağlayan kart bileşeni (QGroupBox).
+    """
     def __init__(self, title, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet("InfoCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333; }")
+        super().__init__(title, parent)
+        
+        self.setStyleSheet("""
+            QGroupBox {
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 20px; 
+                font-weight: bold;
+                color: #60cdff; 
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 10px;
+                left: 10px;
+            }
+        """)
+        
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
+        shadow.setBlurRadius(15)
         shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 100))
         self.setGraphicsEffect(shadow)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setContentsMargins(15, 20, 15, 15)
         self.layout.setSpacing(15)
-        
-        if title:
-            lbl_title = QLabel(title)
-            lbl_title.setStyleSheet("color: #4dabf7; font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 5px;")
-            self.layout.addWidget(lbl_title)
 
     def add_widget(self, widget):
         self.layout.addWidget(widget)
@@ -238,7 +239,6 @@ class InfoCard(QFrame):
 # 3. ANA PENCERE: CİHAZ EKLE
 # =============================================================================
 class CihazEklePenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -246,8 +246,7 @@ class CihazEklePenceresi(QWidget):
         
         self.setWindowTitle("Yeni Cihaz Ekleme Kartı")
         self.resize(1200, 850)
-        self.setStyleSheet("background-color: #121212;")
-
+        
         self.inputs = {}
         self.control_buttons = {} 
         self.secilen_resim_yolu = None
@@ -260,7 +259,7 @@ class CihazEklePenceresi(QWidget):
         
         self.setup_ui()
         
-        # 🟢 DEĞİŞİKLİK 2: Yetki Uygulama
+        # Yetki Uygulama
         YetkiYoneticisi.uygula(self, "cihaz_ekle")
         
         self.baslangic_yukle()
@@ -273,13 +272,12 @@ class CihazEklePenceresi(QWidget):
         # Header
         header = QFrame()
         header.setFixedHeight(60)
-        header.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #333;")
+        header.setObjectName("panel_frame") 
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(25, 0, 25, 0)
         
         lbl_baslik = QLabel("Yeni Cihaz Kaydı")
         lbl_baslik.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        lbl_baslik.setStyleSheet("color: #ffffff;")
         
         self.progress = QProgressBar()
         self.progress.setFixedSize(150, 6)
@@ -298,7 +296,6 @@ class CihazEklePenceresi(QWidget):
         scroll.setStyleSheet("background: transparent;")
         
         content = QWidget()
-        content.setStyleSheet("background: transparent;")
         
         grid = QGridLayout(content)
         grid.setContentsMargins(25, 25, 25, 25)
@@ -307,27 +304,36 @@ class CihazEklePenceresi(QWidget):
         grid.setColumnStretch(1, 2)
         grid.setColumnStretch(2, 2)
 
-        # --- SOL KOLON (Medya) ---
+        # --- SOL KOLON (Medya & Kimlik ID) ---
         card_media = InfoCard("Medya & Dosyalar")
         
+        # 1. CİHAZ ID (Buraya Taşındı)
+        self.add_modern_input(card_media, "Cihaz ID (Otomatik)", "CihazID")
+        self.inputs["CihazID"].setReadOnly(True)
+        # Özel stil (Okunabilirliği artırmak için)
+        self.inputs["CihazID"].setStyleSheet("background-color: #202020; color: #4dabf7; font-weight: bold;")
+        
+        # 2. Resim Alanı
         self.lbl_resim = QLabel("Görsel Seçilmedi")
         self.lbl_resim.setFixedSize(250, 250)
-        self.lbl_resim.setStyleSheet("background-color: #000; border-radius: 8px; border: 1px solid #333; color: #666;")
+        self.lbl_resim.setStyleSheet("border: 2px dashed #444; border-radius: 8px; color: #666;")
         self.lbl_resim.setAlignment(Qt.AlignCenter)
         self.lbl_resim.setScaledContents(True)
         card_media.add_widget(self.lbl_resim)
         
+        # 3. Dosya Seçiciler
         self.create_file_manager(card_media, "Cihaz Görseli Seç", "Img", is_image=True)
         self.create_file_manager(card_media, "Lisans Belgesi Seç", "NDK_Lisans_Belgesi", is_image=False)
+        
+        # 4. DEMİRBAŞ NO (Buraya Taşındı)
+        self.add_modern_input(card_media, "Demirbaş No", "DemirbasNo")
         
         card_media.layout.addStretch()
         grid.addWidget(card_media, 0, 0, 2, 1)
 
-        # --- ORTA KOLON (Kimlik) ---
+        # --- ORTA KOLON (Kimlik Bilgileri) ---
         card_kimlik = InfoCard("Kimlik Bilgileri")
-        self.add_modern_input(card_kimlik, "Cihaz ID (Otomatik)", "CihazID")
-        self.inputs["CihazID"].setReadOnly(True)
-        self.inputs["CihazID"].setStyleSheet("background-color: #202020; color: #4dabf7; font-weight: bold; border: none;")
+        # Cihaz ID buradan kaldırıldı
         
         row1 = QHBoxLayout(); row1.setSpacing(15)
         self.add_modern_input(row1, "Marka", "Marka", "combo", db_kodu="Marka", stretch=1)
@@ -339,8 +345,12 @@ class CihazEklePenceresi(QWidget):
         self.add_modern_input(row2, "Seri No", "SeriNo", stretch=1)
         card_kimlik.add_layout(row2)
         
-        self.add_modern_input(card_kimlik, "Kullanım Amacı", "Amaç", "combo", db_kodu="Amaç")
-        self.add_modern_input(card_kimlik, "Edinim Kaynağı", "Kaynak", "combo", db_kodu="Kaynak")
+        # AMAÇ ve KAYNAK Yan Yana Getirildi
+        row_amac_kaynak = QHBoxLayout(); row_amac_kaynak.setSpacing(15)
+        self.add_modern_input(row_amac_kaynak, "Kullanım Amacı", "Amaç", "combo", db_kodu="Amaç", stretch=1)
+        self.add_modern_input(row_amac_kaynak, "Edinim Kaynağı", "Kaynak", "combo", db_kodu="Kaynak", stretch=1)
+        card_kimlik.add_layout(row_amac_kaynak)
+        
         grid.addWidget(card_kimlik, 0, 1)
 
         # --- SAĞ KOLON (Lokasyon) ---
@@ -349,7 +359,9 @@ class CihazEklePenceresi(QWidget):
         self.add_modern_input(row3, "Birim", "Birim", "combo", db_kodu="Birim")
         self.add_modern_input(row3, "Bulunduğu Bina", "BulunduguBina")
         card_lokasyon.add_layout(row3)
+        
         self.add_modern_input(card_lokasyon, "Ana Bilim Dalı", "AnaBilimDali", "combo", db_kodu="AnaBilimDali")
+        
         row4 = QHBoxLayout(); row4.setSpacing(15)
         self.add_modern_input(row4, "Sorumlu Kişi", "Sorumlusu")
         self.add_modern_input(row4, "Radyasyon Sor. (RKS)", "RKS")
@@ -373,7 +385,7 @@ class CihazEklePenceresi(QWidget):
         self.add_modern_input_grid(t_grid, 2, 1, "Kalibrasyon Gerekli mi?", "KalibrasyonGereklimi", "combo", db_kodu="Kalibrasyon_Durum", stretch=1)
         self.add_modern_input_grid(t_grid, 2, 2, "Genel Durum", "Durum", "combo", db_kodu="Cihaz_Durum", stretch=1)
 
-        self.add_modern_input_grid(t_grid, 3, 0, "Demirbaş No", "DemirbasNo")
+        # Demirbaş No buradan kaldırıldı
         
         card_teknik.add_layout(t_grid)
         grid.addWidget(card_teknik, 1, 1, 1, 2)
@@ -384,30 +396,21 @@ class CihazEklePenceresi(QWidget):
         # Footer
         footer = QFrame()
         footer.setFixedHeight(80)
-        footer.setStyleSheet("background-color: #1e1e1e; border-top: 1px solid #333;")
+        footer.setObjectName("panel_frame")
         foot_lay = QHBoxLayout(footer)
         foot_lay.setContentsMargins(30, 15, 30, 15)
         foot_lay.setSpacing(15)
         
         self.btn_temizle = QPushButton("🗑️ Formu Temizle")
-        self.btn_temizle.setObjectName("btn_temizle") # 🟢 DEĞİŞİKLİK 3: ObjectName
+        self.btn_temizle.setObjectName("btn_temizle") 
         self.btn_temizle.setFixedSize(160, 45)
         self.btn_temizle.setCursor(Qt.PointingHandCursor)
-        self.btn_temizle.setStyleSheet("""
-            QPushButton { background: transparent; border: 1px solid #555; color: #aaa; border-radius: 8px; font-weight: bold; }
-            QPushButton:hover { background: #333; color: white; }
-        """)
         self.btn_temizle.clicked.connect(self.formu_temizle)
         
         self.btn_kaydet = QPushButton("✅ Sisteme Kaydet")
-        self.btn_kaydet.setObjectName("btn_kaydet") # 🟢 DEĞİŞİKLİK 3: ObjectName
+        self.btn_kaydet.setObjectName("btn_kaydet") 
         self.btn_kaydet.setFixedSize(200, 45)
         self.btn_kaydet.setCursor(Qt.PointingHandCursor)
-        self.btn_kaydet.setStyleSheet("""
-            QPushButton { background-color: #16a34a; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; }
-            QPushButton:hover { background-color: #15803d; }
-            QPushButton:disabled { background-color: #333; color: #555; }
-        """)
         self.btn_kaydet.clicked.connect(self.kaydet_baslat)
         
         foot_lay.addWidget(self.btn_temizle)
@@ -425,13 +428,13 @@ class CihazEklePenceresi(QWidget):
             widget = QDateEdit(); widget.setCalendarPopup(True); widget.setDisplayFormat("dd.MM.yyyy")
             widget.setDate(QDate.currentDate())
         
-        # Objeye erişim için ismi set et (Yetki için opsiyonel ama iyi pratik)
         if widget: widget.setObjectName(f"inp_{key}")
             
         grp = ModernInputGroup(label, widget)
         
         if isinstance(parent, InfoCard): parent.add_widget(grp)
         elif hasattr(parent, "addWidget"): parent.addWidget(grp, stretch)
+        elif hasattr(parent, "addLayout"): parent.addLayout(grp) # Layout desteği
         self.inputs[key] = widget
         return widget
 
@@ -461,7 +464,7 @@ class CihazEklePenceresi(QWidget):
         
         btn_select = QPushButton("📂 Seç" if not is_image else "📷 Görsel Seç")
         btn_select.setCursor(Qt.PointingHandCursor)
-        btn_select.setStyleSheet("background: #333; color: white; border: 1px solid #444; border-radius: 4px; padding: 5px 15px;")
+        # Buton stili temaya bırakıldı
         btn_select.clicked.connect(lambda: self.dosya_sec(key, edt, lbl_status))
         
         lay.addWidget(lbl_status)
@@ -606,7 +609,6 @@ class CihazEklePenceresi(QWidget):
         self.btn_kaydet.setEnabled(True)
         show_error("Hata", f"Kayıt Hatası: {hata}", self)
 
-    # 🟢 DEĞİŞİKLİK 4: Thread Güvenliği
     def closeEvent(self, event):
         if hasattr(self, 'loader') and self.loader.isRunning():
             self.loader.quit()
@@ -618,6 +620,14 @@ class CihazEklePenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Tema uygulaması eklendi
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
+        app.setStyle("Fusion")
+        
     win = CihazEklePenceresi()
     win.show()
     sys.exit(app.exec())

@@ -14,37 +14,39 @@ from PySide6.QtWidgets import (
 )
 
 # --- YOL AYARLARI ---
+# Dosyanın 'formlar' klasöründe olduğu varsayılarak proje kök dizini eklenir
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-# Yetki Yöneticisi
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
-# --- MODÜLLER ---
+# --- PROJE MODÜLLERİ ---
 try:
-    # Google Servisleri ve Hata Sınıfları
+    # Yetki ve Araçlar
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from araclar.ortak_araclar import (
+        OrtakAraclar, pencereyi_kapat, show_info, show_error, show_question,
+        validate_required_fields, kayitlari_getir
+    )
+    # Tema Yöneticisi
+    from temalar.tema import TemaYonetimi
+
+    # Google Servisleri
     from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi
     try:
         from google_baglanti import GoogleDriveService
     except ImportError:
         GoogleDriveService = None
         
-    # Ortak Araçlar
-    from araclar.ortak_araclar import (
-        OrtakAraclar, pencereyi_kapat, show_info, show_error, show_question,
-        validate_required_fields, kayitlari_getir
-    )
 except ImportError as e:
-    print(f"Modül Hatası: {e}")
+    print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
     sys.exit(1)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("PersonelDetay")
 
 # =============================================================================
-# WORKER: GÜNCELLEME İŞLEMİ
+# WORKER: GÜNCELLEME İŞLEMİ (MANTIK KORUNDU)
 # =============================================================================
 class GuncelleWorker(QThread):
     islem_tamam = Signal()
@@ -55,16 +57,15 @@ class GuncelleWorker(QThread):
         self.tc = tc_kimlik
         self.data = yeni_veri_dict
         self.files = dosya_yollari
-        self.links = mevcut_linkler # Mevcut drive linkleri (korumak için)
+        self.links = mevcut_linkler 
         self.drive_ids = drive_ids
 
     def run(self):
         try:
-            # 1. DOSYA YÜKLEME (Varsa)
+            # 1. DOSYA YÜKLEME
             if GoogleDriveService and any(self.files.values()):
                 drive = GoogleDriveService()
                 
-                # ID'leri al
                 id_resim = self.drive_ids.get("Personel_Resim", "")
                 id_diploma = self.drive_ids.get("Personel_Diploma", "")
                 
@@ -75,13 +76,11 @@ class GuncelleWorker(QThread):
                         if hedef_id:
                             _, uzanti = os.path.splitext(path)
                             
-                            # İsimlendirme
                             if key == "Resim": yeni_isim = f"{self.tc}_profil_resim{uzanti}"
                             elif key == "Diploma1": yeni_isim = f"{self.tc}_diploma_1{uzanti}"
                             elif key == "Diploma2": yeni_isim = f"{self.tc}_diploma_2{uzanti}"
                             else: yeni_isim = os.path.basename(path)
                             
-                            # Yükle ve Linki Güncelle
                             link = drive.upload_file(path, hedef_id, custom_name=yeni_isim)
                             if link:
                                 self.links[key] = link
@@ -93,18 +92,8 @@ class GuncelleWorker(QThread):
             if not cell:
                 raise Exception("Personel veritabanında bulunamadı (TC değişmiş olabilir).")
                 
-            # Satır verisini hazırla (Sıralama Personel Listesi/Ekle ile AYNI OLMALI)
-            # [TC, Ad, DogumYeri, DogumTarihi, Hizmet, Kadro, GorevYeri, Sicil, Baslama, Tel, Email, 
-            #  Okul1, Fak1, Mezun1, Dip1, Okul2, Fak2, Mezun2, Dip2, ResimLink, Dip1Link, Dip2Link, Durum]
-            
-            # Mevcut satırı alıp sadece değişenleri güncellemek daha güvenli olabilir ama 
-            # burada tüm satırı yeniden oluşturuyoruz.
-            
-            # Not: UI'da olmayan "Durum" bilgisi kaybolmasın diye onu okumamız lazım ama 
-            # basitlik adına "Aktif" varsayıyoruz veya UI'da hidden bir alanda tutabiliriz.
-            # Şimdilik mevcut satırı okuyalım:
             mevcut_satir = ws.row_values(cell.row)
-            durum = mevcut_satir[-1] if mevcut_satir else "Aktif" # Son sütun Durum varsayımı
+            durum = mevcut_satir[-1] if mevcut_satir else "Aktif" 
             
             guncel_satir = [
                 self.data.get('tc', ''),
@@ -132,12 +121,7 @@ class GuncelleWorker(QThread):
                 durum
             ]
             
-            # Güncelle
-            # Not: update(range_name, values) kullanılabilir veya satır sil-ekle yapılabilir.
-            # Hücre hücre güncellemek yavaş olacağı için satır güncelleme en iyisi.
-            # gspread'in update metodu:
             ws.update(f"A{cell.row}:W{cell.row}", [guncel_satir])
-            
             self.islem_tamam.emit()
 
         except InternetBaglantiHatasi:
@@ -146,7 +130,7 @@ class GuncelleWorker(QThread):
             self.hata_olustu.emit(f"Güncelleme hatası: {str(e)}")
 
 # =============================================================================
-# WORKER: RESİM İNDİRME
+# WORKER: RESİM İNDİRME (MANTIK KORUNDU)
 # =============================================================================
 class ResimIndirWorker(QThread):
     resim_indi = Signal(QPixmap)
@@ -158,8 +142,6 @@ class ResimIndirWorker(QThread):
     def run(self):
         try:
             if not self.url: return
-            # Drive linkini indirme linkine çevir (GoogleDriveService içinde helper olabilir ama burada manuel yapalım)
-            # File ID'yi ayıkla
             file_id = None
             if "id=" in self.url: file_id = self.url.split("id=")[1].split("&")[0]
             elif "/d/" in self.url: file_id = self.url.split("/d/")[1].split("/")[0]
@@ -177,15 +159,15 @@ class ResimIndirWorker(QThread):
 # ANA FORM
 # =============================================================================
 class PersonelDetayPenceresi(QWidget):
-    veri_guncellendi = Signal() # Listeyi yenilemek için sinyal
+    veri_guncellendi = Signal() 
 
     def __init__(self, personel_data_row, yetki='viewer', kullanici_adi=None):
         super().__init__()
-        self.personel_data = personel_data_row # Liste olarak gelir
+        self.personel_data = personel_data_row 
         self.yetki = yetki
         self.kullanici_adi = kullanici_adi
         
-        self.setWindowTitle(f"Personel Detay: {self.personel_data[1]}") # Ad Soyad
+        self.setWindowTitle(f"Personel Detay: {self.personel_data[1]}") 
         self.resize(1100, 800)
         
         # State
@@ -198,12 +180,12 @@ class PersonelDetayPenceresi(QWidget):
             "Diploma2": self.personel_data[21] if len(self.personel_data)>21 else ""
         }
         
-        self.drive_config = {} # Sabitler yüklenince dolacak
+        self.drive_config = {} 
 
         self._setup_ui()
         self._sabitleri_yukle()
         self._verileri_forma_yaz()
-        self._mod_degistir(False) # Başlangıçta salt okunur
+        self._mod_degistir(False) 
         
         # Yetki Kontrolü
         YetkiYoneticisi.uygula(self, "personel_detay")
@@ -221,19 +203,20 @@ class PersonelDetayPenceresi(QWidget):
         top_bar = QHBoxLayout()
         
         self.lbl_baslik = QLabel(f"👤 {self.personel_data[1]}")
-        self.lbl_baslik.setStyleSheet("font-size: 18px; font-weight: bold; color: #4dabf7;")
+        # Başlık için tema uyumlu ancak belirgin bir stil bırakılabilir veya temaya devredilebilir.
+        # Burada sadece font ayarı bırakıp rengi temadan almasını sağlıyoruz.
+        self.lbl_baslik.setStyleSheet("font-size: 18px; font-weight: bold;")
         
+        # Manuel renkler kaldırıldı, ID'ler korundu.
         self.btn_duzenle = OrtakAraclar.create_button(self, "✏️ Düzenle", self._duzenle_tiklandi)
         self.btn_duzenle.setObjectName("btn_duzenle")
-        self.btn_duzenle.setStyleSheet("background-color: #f57c00; color: white; font-weight: bold;")
         
         self.btn_kaydet = OrtakAraclar.create_button(self, "💾 Kaydet", self._kaydet_baslat)
         self.btn_kaydet.setObjectName("btn_kaydet")
-        self.btn_kaydet.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         self.btn_kaydet.setVisible(False)
         
         self.btn_iptal = OrtakAraclar.create_button(self, "❌ İptal", self._iptal_tiklandi)
-        self.btn_iptal.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
+        self.btn_iptal.setObjectName("btn_iptal")
         self.btn_iptal.setVisible(False)
 
         top_bar.addWidget(self.lbl_baslik)
@@ -262,6 +245,7 @@ class PersonelDetayPenceresi(QWidget):
         v_res.setAlignment(Qt.AlignCenter)
         self.lbl_resim = QLabel("Fotoğraf Yok")
         self.lbl_resim.setFixedSize(150, 170)
+        # Resim çerçevesi özel olduğu için korunabilir
         self.lbl_resim.setStyleSheet("border: 2px dashed #555; background: #2b2b2b; border-radius: 8px;")
         self.lbl_resim.setScaledContents(True)
         self.btn_resim_degis = OrtakAraclar.create_button(grp_resim, "Değiştir...", lambda: self._dosya_sec("Resim"))
@@ -273,10 +257,10 @@ class PersonelDetayPenceresi(QWidget):
         # Kimlik Grubu
         grp_kimlik = OrtakAraclar.create_group_box(content_widget, "Kimlik Bilgileri")
         f_kimlik = QFormLayout(grp_kimlik)
-        self.ui['tc'] = OrtakAraclar.create_line_edit(grp_kimlik); self.ui['tc'].setReadOnly(True) # TC Değişmez
+        self.ui['tc'] = OrtakAraclar.create_line_edit(grp_kimlik); self.ui['tc'].setReadOnly(True)
         self.ui['ad_soyad'] = OrtakAraclar.create_line_edit(grp_kimlik)
         self.ui['dogum_yeri'] = OrtakAraclar.create_line_edit(grp_kimlik)
-        self.ui['dogum_tarihi'] = OrtakAraclar.create_line_edit(grp_kimlik) # DateEdit yerine string tutuyoruz basitleştirmek için, istenirse DateEdit'e çevrilebilir
+        self.ui['dogum_tarihi'] = OrtakAraclar.create_line_edit(grp_kimlik) 
         f_kimlik.addRow("TC No:", self.ui['tc'])
         f_kimlik.addRow("Ad Soyad:", self.ui['ad_soyad'])
         f_kimlik.addRow("Doğum Yeri:", self.ui['dogum_yeri'])
@@ -300,8 +284,9 @@ class PersonelDetayPenceresi(QWidget):
         
         # Kurumsal
         grp_kurum = OrtakAraclar.create_group_box(content_widget, "Kurumsal Bilgiler")
+        grp_kurum.setFixedHeight(250)
         f_kurum = QFormLayout(grp_kurum)
-        self.ui['hizmet_sinifi'] = OrtakAraclar.create_combo_box(grp_kurum) # Combo olacak
+        self.ui['hizmet_sinifi'] = OrtakAraclar.create_combo_box(grp_kurum)
         self.ui['kadro_unvani'] = OrtakAraclar.create_combo_box(grp_kurum)
         self.ui['gorev_yeri'] = OrtakAraclar.create_combo_box(grp_kurum)
         self.ui['sicil_no'] = OrtakAraclar.create_line_edit(grp_kurum)
@@ -316,6 +301,7 @@ class PersonelDetayPenceresi(QWidget):
         
         # Eğitim Tabları
         grp_egitim = OrtakAraclar.create_group_box(content_widget, "Eğitim Bilgileri")
+        grp_egitim.setFixedHeight(300)
         v_egitim = QVBoxLayout(grp_egitim)
         self.tab_egitim = QTabWidget()
         
@@ -374,11 +360,8 @@ class PersonelDetayPenceresi(QWidget):
 
     # --- VERİ YÖNETİMİ ---
     def _sabitleri_yukle(self):
-        # Sabitleri worker olmadan da yükleyebiliriz hızlıca (cache varsa)
-        # Ama burada basitçe sabitler_yukle fonksiyonunu kullanacağız
         try:
             sabitler = kayitlari_getir(veritabani_getir, 'sabit', 'Sabitler')
-            # Drive ID'lerini ve Comboları ayıkla
             hizmet = set()
             unvan = set()
             gorev = set()
@@ -394,7 +377,6 @@ class PersonelDetayPenceresi(QWidget):
                 elif kod == 'Kadro_Unvani': unvan.add(val)
                 elif kod == 'Gorev_Yeri': gorev.add(val)
             
-            # Comboları doldur
             self.ui['hizmet_sinifi'].addItems(sorted(list(hizmet)))
             self.ui['kadro_unvani'].addItems(sorted(list(unvan)))
             self.ui['gorev_yeri'].addItems(sorted(list(gorev)))
@@ -403,12 +385,8 @@ class PersonelDetayPenceresi(QWidget):
             print(f"Sabit yükleme hatası: {e}")
 
     def _verileri_forma_yaz(self):
-        # self.personel_data listesindeki indexlere göre map et
-        # Sıralama: 0:TC, 1:Ad, 2:D_Yeri, 3:D_Tarihi, 4:Hizmet, 5:Kadro, 6:Gorev, 7:Sicil, 8:Baslama, 9:Tel, 10:Email...
-        
         mapping = {
             'tc': 0, 'ad_soyad': 1, 'dogum_yeri': 2, 'dogum_tarihi': 3,
-            # Comboboxlar için text set edeceğiz
             'sicil_no': 7, 'baslama_tarihi': 8, 'cep_tel': 9, 'eposta': 10,
             'okul1': 11, 'fakulte1': 12, 'mezun_tarihi1': 13, 'diploma_no1': 14,
             'okul2': 15, 'fakulte2': 16, 'mezun_tarihi2': 17, 'diploma_no2': 18
@@ -419,13 +397,12 @@ class PersonelDetayPenceresi(QWidget):
             if isinstance(self.ui[key], QLineEdit):
                 self.ui[key].setText(val)
         
-        # Comboları Set Et
         def set_combo(key, idx):
             val = str(self.personel_data[idx]) if len(self.personel_data) > idx else ""
             cb = self.ui[key]
             index = cb.findText(val)
             if index >= 0: cb.setCurrentIndex(index)
-            else: cb.addItem(val); cb.setCurrentText(val) # Listede yoksa ekle
+            else: cb.addItem(val); cb.setCurrentText(val)
             
         set_combo('hizmet_sinifi', 4)
         set_combo('kadro_unvani', 5)
@@ -434,7 +411,6 @@ class PersonelDetayPenceresi(QWidget):
     def _mod_degistir(self, duzenlenebilir):
         self.duzenleme_modu = duzenlenebilir
         
-        # Buton Görünürlüğü
         self.btn_duzenle.setVisible(not duzenlenebilir)
         self.btn_kaydet.setVisible(duzenlenebilir)
         self.btn_iptal.setVisible(duzenlenebilir)
@@ -443,13 +419,12 @@ class PersonelDetayPenceresi(QWidget):
         self.btn_up_dip1.setVisible(duzenlenebilir)
         self.btn_up_dip2.setVisible(duzenlenebilir)
         
-        # Widget Durumları
         for key, widget in self.ui.items():
-            if key == 'tc': continue # TC asla değişmez
+            if key == 'tc': continue 
             
             if isinstance(widget, QLineEdit):
                 widget.setReadOnly(not duzenlenebilir)
-                widget.setStyleSheet("background-color: #333;" if not duzenlenebilir else "background-color: #2b2b2b; border: 1px solid #0078d4;")
+                # Manuel stil kaldırıldı, tema.py readOnly durumunu yönetiyor
             elif isinstance(widget, QComboBox):
                 widget.setEnabled(duzenlenebilir)
 
@@ -458,8 +433,8 @@ class PersonelDetayPenceresi(QWidget):
 
     def _iptal_tiklandi(self):
         if show_question("İptal", "Değişiklikleri iptal etmek istiyor musunuz?", self):
-            self._verileri_forma_yaz() # Eski veriyi geri yükle
-            self.dosya_yollari = {k:None for k in self.dosya_yollari} # Seçimleri temizle
+            self._verileri_forma_yaz()
+            self.dosya_yollari = {k:None for k in self.dosya_yollari}
             self._mod_degistir(False)
 
     def _dosya_sec(self, key):
@@ -469,7 +444,7 @@ class PersonelDetayPenceresi(QWidget):
             self.dosya_yollari[key] = path
             show_info("Seçildi", f"{key} için dosya seçildi:\n{os.path.basename(path)}", self)
             
-            if key == "Resim": # Önizleme güncelle
+            if key == "Resim": 
                 self.lbl_resim.setPixmap(QPixmap(path).scaled(150, 170, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def _dosya_ac(self, key):
@@ -486,7 +461,6 @@ class PersonelDetayPenceresi(QWidget):
         self.btn_kaydet.setEnabled(False)
         self.progress.setVisible(True); self.progress.setRange(0, 0)
         
-        # Verileri topla
         data = {}
         for k, v in self.ui.items():
             if isinstance(v, QComboBox): data[k] = v.currentText()
@@ -525,7 +499,10 @@ class PersonelDetayPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # Test datası
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
     dummy_data = ["12345678901", "Test Personel", "İst", "01.01.1990", "İdari", "Uzman", "Merkez", "101", "01.01.2020", "555", "a@a.com"] + [""]*15
     win = PersonelDetayPenceresi(dummy_data)
     win.show()

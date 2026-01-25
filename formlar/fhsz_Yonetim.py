@@ -26,111 +26,74 @@ except ImportError as e:
         def __init__(self, y=None, k=None): super().__init__()
 
 # =============================================================================
-# 1. FHSZ YÖNETİM PANELİ
+# FHSZ YÖNETİM PANELİ
 # =============================================================================
-
 class FHSZYonetimPaneli(QWidget):
-    # 🟢 DÜZELTME 1: Main.py uyumu için 'kullanici_adi' parametresi eklendi
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
         self.kullanici_adi = kullanici_adi
         
-        self.setWindowTitle("FHSZ Yönetim Sistemi")
-        self.resize(1350, 900)
+        self.setWindowTitle("FHSZ (Şua) Yönetim Paneli")
+        self.resize(1300, 850)
         
-        # Ana Düzen
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        self.setup_ui()
         
-        # --- BAŞLIK ---
-        lbl_baslik = QLabel("Radyoloji / FHSZ (Şua) Takip Sistemi")
-        lbl_baslik.setStyleSheet("font-size: 20px; font-weight: bold; color: #4dabf7; margin-bottom: 5px;")
-        layout.addWidget(lbl_baslik)
+        # Yetki Kontrolü
+        YetkiYoneticisi.uygula(self, "fhsz_yonetim")
 
-        # --- SEKME (TAB) YAPISI ---
+    def setup_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+        
+        # Başlık
+        lbl_baslik = QLabel("FHSZ (Şua) Hakediş ve Raporlama Sistemi")
+        lbl_baslik.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        # Manuel renk kaldırıldı, tema.py yönetecek
+        main_layout.addWidget(lbl_baslik)
+        
+        # Tab Widget
         self.tabs = QTabWidget()
-        self.tabs.setObjectName("tabs_fhsz") # Yetki için isim
-        self.tabs.setStyleSheet("""
-            QTabWidget::pane { 
-                border: 1px solid #3e3e42; 
-                background: #1e1e1e; 
-                border-radius: 4px;
-            }
-            QTabBar::tab {
-                background: #2d2d30;
-                color: #aaa;
-                padding: 12px 25px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-                margin-right: 2px;
-                font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #3e3e42;
-                border-bottom: none;
-            }
-            QTabBar::tab:selected {
-                background: #0078d4; 
-                color: white;
-                border-color: #0078d4;
-            }
-            QTabBar::tab:hover {
-                background: #3e3e42;
-                color: white;
-            }
-        """)
-
+        
         # --- 1. SEKME: HESAPLAMA ---
-        # Yetki ve kullanıcı adını alt forma iletiyoruz
         self.tab_hesapla = FHSZHesaplamaPenceresi(self.yetki, self.kullanici_adi)
-        self.tab_hesapla.setObjectName("tab_hesapla") # Yetki için
-        
-        # Alt formdaki "Kapat/Çıkış" butonlarını gizle (Çünkü zaten ana pencere içinde)
-        # 1. Yöntem: Doğrudan erişim (Varsa)
-        if hasattr(self.tab_hesapla, 'btn_kapat'):
-            self.tab_hesapla.btn_kapat.setVisible(False)
-        # 2. Yöntem: Genel arama (Yedek)
-        else:
-            btns = self.tab_hesapla.findChildren(QPushButton)
-            for b in btns:
-                text = b.text().lower()
-                if "çıkış" in text or "iptal" in text or "kapat" in text:
-                    b.setVisible(False)
-            
+        self._gizle_kapat_butonlari(self.tab_hesapla)
         self.tabs.addTab(self.tab_hesapla, "📝 Hesaplama ve Veri Girişi")
-
-        # --- 2. SEKME: RAPORLAMA ---
-        # Yetki ve kullanıcı adını alt forma iletiyoruz
-        self.tab_rapor = PuantajRaporPenceresi(self.yetki, self.kullanici_adi)
-        self.tab_rapor.setObjectName("tab_rapor") # Yetki için
         
-        # Buton gizleme
-        if hasattr(self.tab_rapor, 'btn_kapat'): # btn_kapat varsa gizle
-             self.tab_rapor.btn_kapat.setVisible(False)
-        else:
-            btns = self.tab_rapor.findChildren(QPushButton)
-            for b in btns:
-                text = b.text().lower()
-                if "çıkış" in text or "iptal" in text or "kapat" in text:
-                    b.setVisible(False)
-
+        # --- 2. SEKME: RAPORLAMA ---
+        self.tab_rapor = PuantajRaporPenceresi(self.yetki, self.kullanici_adi)
+        self._gizle_kapat_butonlari(self.tab_rapor)
         self.tabs.addTab(self.tab_rapor, "📊 Raporlar ve Analiz")
         
-        # 🟢 YETKİ KURALINI UYGULA
-        YetkiYoneticisi.uygula(self, "fhsz_yonetim")
-        
-        layout.addWidget(self.tabs)
+        main_layout.addWidget(self.tabs)
+
+    def _gizle_kapat_butonlari(self, widget):
+        """
+        Alt formlar bir container içinde çalıştığı için, onların kendi 
+        'Kapat' veya 'İptal' butonlarına gerek yoktur. Bu metod onları gizler.
+        """
+        # Bilinen ID'ler
+        if hasattr(widget, 'btn_iptal'): widget.btn_iptal.setVisible(False)
+        if hasattr(widget, 'btn_kapat'): widget.btn_kapat.setVisible(False)
+            
+        # Genel Arama (Metin bazlı)
+        btns = widget.findChildren(QPushButton)
+        for b in btns:
+            text = b.text().lower()
+            if "çıkış" in text or "iptal" in text or "kapat" in text:
+                b.setVisible(False)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
+    # Tema uygulaması
     try:
-        from temalar.tema import TemaYonetimi
         TemaYonetimi.uygula_fusion_dark(app)
-    except:
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
         app.setStyle("Fusion")
-
-    window = FHSZYonetimPaneli()
-    window.show()
+    
+    win = FHSZYonetimPaneli()
+    win.show()
     sys.exit(app.exec())

@@ -11,36 +11,43 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, 
     QDateEdit, QSpinBox, QFrame, QAbstractItemView, QMessageBox,
-    QGroupBox, QScrollArea, QSplitter, QLineEdit, QAbstractSpinBox, QProgressBar, QGridLayout
+    QGroupBox, QScrollArea, QSplitter, QLineEdit, QAbstractSpinBox, QProgressBar, QGridLayout, QApplication
 )
 
 # --- YOL AYARLARI ---
+# Dosyanın 'formlar' klasöründe olduğu varsayılarak proje kök dizini eklenir
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
-# --- MODÜLLER ---
+# --- PROJE MODÜLLERİ ---
 try:
-    from google_baglanti import veritabani_getir
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    # Tema Yöneticisi
+    from temalar.tema import TemaYonetimi
+    
+    # Hata sınıflarını ve veritabanı fonksiyonunu alıyoruz
+    from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi
+    
+    # Ortak Araçlar
     from araclar.ortak_araclar import (
         pencereyi_kapat, show_info, show_error, show_question,
         create_group_box, create_form_layout, kayitlari_getir, 
         add_combo_box, add_date_edit, satir_ekle
     )
 except ImportError as e:
-    print(f"Modül Hatası: {e}")
+    print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("IzinGiris")
 
 # =============================================================================
-# WORKER: VERİLERİ YÜKLE
+# WORKER: VERİLERİ YÜKLE (MANTIK KORUNDU)
 # =============================================================================
 class VeriYukleyici(QThread):
     veri_hazir = Signal(dict)
+    hata_olustu = Signal(str) 
     
     def run(self):
         data = {
@@ -93,14 +100,19 @@ class VeriYukleyici(QThread):
             # 4. İZİN BİLGİ (BAKİYE)
             bakiye = kayitlari_getir(veritabani_getir, 'personel', 'izin_bilgi')
             data['izin_bilgi'] = bakiye if bakiye else []
+            
+            self.veri_hazir.emit(data)
 
+        except InternetBaglantiHatasi:
+            self.hata_olustu.emit("İnternet bağlantısı yok. Veriler yüklenemedi.")
+        except KimlikDogrulamaHatasi:
+            self.hata_olustu.emit("Oturum süresi doldu. Lütfen programı yeniden başlatın.")
         except Exception as e:
             logger.error(f"Veri yükleme hatası: {e}")
-        
-        self.veri_hazir.emit(data)
+            self.hata_olustu.emit(f"Veri yükleme hatası: {str(e)}")
 
 # =============================================================================
-# WORKER: KAYIT / GÜNCELLEME (YIL İÇİ TOPLAMLAR EKLENDİ)
+# WORKER: KAYIT / GÜNCELLEME (MANTIK KORUNDU)
 # =============================================================================
 class KayitWorker(QThread):
     islem_tamam = Signal()
@@ -120,8 +132,8 @@ class KayitWorker(QThread):
             row_giris = [
                 self.data.get('Id'),
                 self.data.get('Hizmet_Sinifi'),
-                self.data.get('personel_id'), # TC
-                self.data.get('Ad_Soyad'),    # İsim
+                self.data.get('personel_id'),
+                self.data.get('Ad_Soyad'),
                 self.data.get('izin_tipi'),
                 self.data.get('Baslama_Tarihi'),
                 self.data.get('Gun'),
@@ -133,11 +145,11 @@ class KayitWorker(QThread):
             elif self.tip == "guncelle":
                 cell = ws_giris.find(self.data.get('Id'))
                 if cell:
-                    ws_giris.update(f"A{cell.row}", [row_giris])
+                    ws_giris.update(f"A{cell.row}:H{cell.row}", [row_giris])
                 else:
                     raise Exception("Güncellenecek kayıt bulunamadı.")
 
-            # --- B. İZİN BİLGİ (BAKİYE & YIL TOPLAMLARI) GÜNCELLEME ---
+            # --- B. İZİN BİLGİ (BAKİYE) GÜNCELLEME ---
             if self.tip == "yeni":
                 ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
                 
@@ -146,7 +158,6 @@ class KayitWorker(QThread):
                 gun_sayisi = int(self.data.get('Gun', 0))
                 baslama_tarihi_str = str(self.data.get('Baslama_Tarihi'))
 
-                # Tarih Kontrolü (Yıl Hesabı İçin)
                 try:
                     tarih_obj = datetime.strptime(baslama_tarihi_str, "%d.%m.%Y")
                     izin_yili = tarih_obj.year
@@ -155,16 +166,13 @@ class KayitWorker(QThread):
                     izin_yili = 0
                     suanki_yil = 1
 
-                # TC Kimlik Numarasına göre satırı bul
                 try:
-                    kimlik_kolonu = ws_bilgi.col_values(2) # 2. Sütun = Kimlik_No
+                    kimlik_kolonu = ws_bilgi.col_values(2) 
                     row_idx = kimlik_kolonu.index(hedef_tc) + 1 
                 except ValueError:
                     row_idx = None
 
                 if row_idx:
-                    # Sütun İndeksleri: 4:Hak, 5:Devir, 7:Kul, 8:Kalan, 10:Kul_Sua
-                    
                     def safe_int(row, col):
                         val = ws_bilgi.cell(row, col).value
                         if val and str(val).replace('.', '', 1).isdigit():
@@ -180,7 +188,6 @@ class KayitWorker(QThread):
                         
                         dusulecek = gun_sayisi
                         
-                        # Önce devirden düş
                         if devir >= dusulecek:
                             devir -= dusulecek
                             dusulecek = 0
@@ -188,38 +195,37 @@ class KayitWorker(QThread):
                             dusulecek -= devir
                             devir = 0
                         
-                        # Kalanı haktan düş
                         hak_edilen -= dusulecek
-                        
                         yeni_kalan = hak_edilen + devir
                         
                         ws_bilgi.update_cell(row_idx, 4, hak_edilen)
                         ws_bilgi.update_cell(row_idx, 5, devir)
                         ws_bilgi.update_cell(row_idx, 8, yeni_kalan)
 
-                        # Bu Yıl Yıllık İzin Toplamı (Tahmini Sütun 11)
                         if izin_yili == suanki_yil:
                             bu_yil_yillik = safe_int(row_idx, 11)
                             ws_bilgi.update_cell(row_idx, 11, bu_yil_yillik + gun_sayisi)
 
                     else:
-                        # Şua veya Diğer İzinler
                         if "şua" in izin_tipi or "sua" in izin_tipi:
                             kul_sua = safe_int(row_idx, 10)
                             ws_bilgi.update_cell(row_idx, 10, kul_sua + gun_sayisi)
                         
-                        # Bu Yıl Diğer İzin Toplamı (Tahmini Sütun 12)
                         if izin_yili == suanki_yil:
                             bu_yil_diger = safe_int(row_idx, 12)
                             ws_bilgi.update_cell(row_idx, 12, bu_yil_diger + gun_sayisi)
 
             self.islem_tamam.emit()
 
+        except InternetBaglantiHatasi:
+            self.hata_olustu.emit("İnternet bağlantısı kesildi. Kayıt yapılamadı.")
+        except KimlikDogrulamaHatasi:
+            self.hata_olustu.emit("Google oturumu kapandı. Lütfen tekrar giriş yapın.")
         except Exception as e:
-            self.hata_olustu.emit(str(e))
+            self.hata_olustu.emit(f"Kayıt hatası: {str(e)}")
 
 # =============================================================================
-# WORKER: SİLME
+# WORKER: SİLME (MANTIK KORUNDU)
 # =============================================================================
 class SilWorker(QThread):
     islem_tamam = Signal()
@@ -235,13 +241,16 @@ class SilWorker(QThread):
                 ws.delete_rows(cell.row)
                 self.islem_tamam.emit()
             else: self.hata_olustu.emit("Silinecek kayıt bulunamadı.")
-        except Exception as e: self.hata_olustu.emit(str(e))
+        
+        except InternetBaglantiHatasi:
+            self.hata_olustu.emit("İnternet bağlantısı yok. Silme işlemi yapılamadı.")
+        except Exception as e: 
+            self.hata_olustu.emit(f"Silme hatası: {str(e)}")
 
 # =============================================================================
 # ANA FORM
 # =============================================================================
 class IzinGirisPenceresi(QWidget):
-    # DÜZELTME 1: Parametreler güncellendi
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -257,12 +266,16 @@ class IzinGirisPenceresi(QWidget):
         self.ui = {}
 
         self._setup_ui()
+        # Verileri Yükle
         self._verileri_yukle()
+        
+        # Yetki Kuralı
+        YetkiYoneticisi.uygula(self, "izin_giris")
 
     def _setup_ui(self):
         main_layout = QHBoxLayout(self)
         
-        # --- SOL TARA ---
+        # --- SOL TARAF ---
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0,0,0,0)
@@ -306,21 +319,21 @@ class IzinGirisPenceresi(QWidget):
         self.ui['bitis'].setReadOnly(True)
         self.ui['bitis'].setDisplayFormat("dd.MM.yyyy")
         self.ui['bitis'].setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.ui['bitis'].setStyleSheet("background-color: #2b2b2b; color: #aaa; border: 1px solid #444;")
+        # Manuel stil temizlendi, tema yönetecek
         self.ui['bitis'].setFixedHeight(35)
         form_layout.addRow("Bitiş Tarihi:", self.ui['bitis'])
 
         h_btn = QHBoxLayout()
-        # DÜZELTME 2: Butonlara objectName verildi
+        
         self.btn_temizle = QPushButton("Yeni Kayıt")
         self.btn_temizle.setObjectName("btn_temizle")
         self.btn_temizle.setFixedHeight(40)
         self.btn_temizle.clicked.connect(self._formu_temizle)
         
         self.btn_kaydet = QPushButton("KAYDET")
-        self.btn_kaydet.setObjectName("btn_kaydet")
+        self.btn_kaydet.setObjectName("btn_kaydet") # Tema ID'si
         self.btn_kaydet.setFixedHeight(40)
-        self.btn_kaydet.setStyleSheet("background-color: #0067c0; color: white; font-weight: bold;")
+        # Varsayılan mavi stil temadan gelecek
         self.btn_kaydet.clicked.connect(self._kaydet_baslat)
 
         h_btn.addWidget(self.btn_temizle)
@@ -342,6 +355,7 @@ class IzinGirisPenceresi(QWidget):
         self.lbl_hak_sua = QLabel("-")
         self.lbl_kul_sua = QLabel("-")
 
+        # Özel veri gösterimi olduğu için bu stilleri koruyoruz/sadeleştiriyoruz
         val_style = "font-weight: bold; color: #4caf50; font-size: 13px;"
         
         bilgi_layout.addWidget(QLabel("Devreden İzin:"), 0, 0)
@@ -421,15 +435,13 @@ class IzinGirisPenceresi(QWidget):
         self.progress.setVisible(False)
         self.progress.setStyleSheet("QProgressBar { max-height: 5px; background: #333; border:none; } QProgressBar::chunk { background: #00ccff; }")
         self.progress.setGeometry(0, 0, self.width(), 5)
-        
-        # 🟢 YETKİ KURALINI UYGULA
-        YetkiYoneticisi.uygula(self, "izin_giris")
 
     # --- LOJİK İŞLEMLER ---
     def _verileri_yukle(self):
         self.progress.setVisible(True); self.progress.setRange(0,0)
         self.worker = VeriYukleyici()
         self.worker.veri_hazir.connect(self._veriler_geldi)
+        self.worker.hata_olustu.connect(self._hata_goster)
         self.worker.start()
 
     def _veriler_geldi(self, data):
@@ -488,7 +500,6 @@ class IzinGirisPenceresi(QWidget):
                 self.lbl_devir.setText(str(row.get('Devir', '-')))
                 self.lbl_hakedilen.setText(str(row.get('Hak_Edilen', '-')))
                 self.lbl_kullanilan.setText(str(row.get('Toplam', '-')))
-                self.lbl_kullanilan.setText(str(row.get('Kullanilan_Dig_İzin', '-')))
                 self.lbl_kalan.setText(str(row.get('Kalan', '-')))
                 self.lbl_hak_sua.setText(str(row.get('Hak_Edilen_sua', '-')))
                 self.lbl_kul_sua.setText(str(row.get('Kullanilan_sua', '-')))
@@ -537,6 +548,7 @@ class IzinGirisPenceresi(QWidget):
         data = item.data(Qt.UserRole)
         self.duzenleme_modu = True
         self.btn_kaydet.setText("GÜNCELLE")
+        # Güncelleme butonu için spesifik renk belirtimi (UI state değişimi olduğu için korunabilir)
         self.btn_kaydet.setStyleSheet("background-color: #f0ad4e; color: white; font-weight: bold;")
         
         self.txt_id.setText(str(data.get('Id')))
@@ -557,7 +569,8 @@ class IzinGirisPenceresi(QWidget):
     def _formu_temizle(self):
         self.duzenleme_modu = False
         self.btn_kaydet.setText("KAYDET")
-        self.btn_kaydet.setStyleSheet("background-color: #0067c0; color: white; font-weight: bold;")
+        # Varsayılan duruma dönüş, tema rengi için stil temizlenir
+        self.btn_kaydet.setStyleSheet("") 
         self.txt_id.clear()
         self.ui['personel'].setCurrentIndex(0)
         self.ui['izin_tipi'].setCurrentIndex(0)
@@ -616,7 +629,6 @@ class IzinGirisPenceresi(QWidget):
         self.btn_kaydet.setEnabled(True)
         show_error("Hata", str(err), self)
 
-    # 🟢 DÜZELTME 3: Çökme Önleyici
     def closeEvent(self, event):
         worker_names = ['worker', 'k_worker', 'sil_worker']
         for name in worker_names:
@@ -628,10 +640,11 @@ class IzinGirisPenceresi(QWidget):
         event.accept()
 
 if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-    from temalar.tema import TemaYonetimi
     app = QApplication(sys.argv)
-    TemaYonetimi.uygula_fusion_dark(app)
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
     win = IzinGirisPenceresi()
     win.show()
     sys.exit(app.exec())

@@ -14,22 +14,26 @@ from PySide6.QtWidgets import (
 )
 
 # --- YOL AYARLARI ---
+# Dosyanın 'formlar' klasöründe olduğu varsayılarak proje kök dizini eklenir
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-from araclar.guvenlik import GuvenlikAraclari
-
-# --- MODÜLLER ---
+# --- PROJE MODÜLLERİ ---
 try:
-    # Veritabanı ve Hata Sınıfları
-    from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi, VeritabaniBulunamadiHatasi
-    
-    # Ortak Araçlar
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from araclar.guvenlik import GuvenlikAraclari
     from araclar.ortak_araclar import (
         OrtakAraclar, show_info, show_error, show_question, pencereyi_kapat
+    )
+    # Tema Yöneticisi
+    from temalar.tema import TemaYonetimi
+    
+    # Veritabanı
+    from google_baglanti import (
+        veritabani_getir, InternetBaglantiHatasi, 
+        KimlikDogrulamaHatasi, VeritabaniBulunamadiHatasi
     )
 
     # Dinamik Form Importları
@@ -40,13 +44,13 @@ try:
         pass
 
 except ImportError as e:
-    print(f"Modül Hatası: {e}")
+    print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("PersonelListesi")
 
 # =============================================================================
-# WORKER SINIFLARI (ASENKRON İŞLEMLER)
+# WORKER SINIFLARI (MANTIK KORUNDU)
 # =============================================================================
 
 class VeriYukleWorker(QThread):
@@ -57,7 +61,6 @@ class VeriYukleWorker(QThread):
     def run(self):
         try:
             ws = veritabani_getir('personel', 'Personel')
-            # get_all_values() tüm tabloyu liste listesi olarak döner (satır satır)
             self.veri_indi.emit(ws.get_all_values())
         except InternetBaglantiHatasi:
             self.hata_olustu.emit("İnternet bağlantısı yok. Lütfen kontrol edin.")
@@ -79,15 +82,12 @@ class DurumGuncelleWorker(QThread):
     def run(self):
         try:
             ws = veritabani_getir('personel', 'Personel')
-            # TC No ile hücreyi bul
             cell = ws.find(self.tc_no)
             if cell:
-                # Başlıkları alıp 'Durum' sütununu bulalım
                 basliklar = ws.row_values(1)
                 try:
                     durum_col_idx = basliklar.index("Durum") + 1
                 except ValueError:
-                    # Eğer sütun yoksa sona ekler gibi davran (Basit mantık)
                     durum_col_idx = len(basliklar) + 1
                 
                 ws.update_cell(cell.row, durum_col_idx, self.yeni_durum)
@@ -117,10 +117,10 @@ class SabitlerWorker(QThread):
             sirali_liste.insert(0, "Tümü")
             self.veri_indi.emit(sirali_liste)
         except Exception: 
-            self.veri_indi.emit(["Tümü"]) # Hata olsa bile boş filtre dön
+            self.veri_indi.emit(["Tümü"]) 
 
 class KullaniciEkleWorker(QThread):
-    """Personeli sisteme kullanıcı (login olabilir) olarak ekler."""
+    """Personeli sisteme kullanıcı olarak ekler."""
     sonuc = Signal(bool, str)
     
     def __init__(self, kimlik, ad_soyad, rol):
@@ -133,7 +133,6 @@ class KullaniciEkleWorker(QThread):
         try:
             ws = veritabani_getir('user', 'user_login')
             
-            # Mükerrer Kontrolü (TC'ye göre)
             tum_kullanicilar = ws.get_all_records()
             for u in tum_kullanicilar:
                 if str(u.get('username')) == self.kimlik:
@@ -141,13 +140,9 @@ class KullaniciEkleWorker(QThread):
                     return
 
             user_id = random.randint(10000, 99999)
-            
-            # Şifreleme (MD5/SHA256 vb. güvenlik modülünden)
             sifreli_pass = GuvenlikAraclari.sifrele("12345")
             
-            # [UserID, Username, Password, Role, LastLogin, IsActive]
             ws.append_row([user_id, self.kimlik, sifreli_pass, self.rol, "", "EVET"])
-            
             self.sonuc.emit(True, f"{self.ad_soyad} sisteme eklendi.\nVarsayılan Şifre: 12345")
         except Exception as e:
             self.sonuc.emit(False, f"Kullanıcı ekleme hatası: {str(e)}")
@@ -183,46 +178,43 @@ class PersonelListesiPenceresi(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # --- ÜST BAR (Filtreler ve Butonlar) ---
+        # --- ÜST BAR ---
         top_bar = QHBoxLayout()
         top_bar.setSpacing(10)
 
-        # 1. Arama Kutusu (Modern)
+        # 1. Arama
         self.txt_ara = OrtakAraclar.create_line_edit(self, placeholder="🔍 İsim, TC veya Birim ara...")
         self.txt_ara.setMinimumWidth(250)
         self.txt_ara.textChanged.connect(self._filtrele_tetikle)
 
-        # 2. Filtre Combo
+        # 2. Filtre
         self.cmb_hizmet_filtre = OrtakAraclar.create_combo_box(self)
         self.cmb_hizmet_filtre.addItem("Hizmet Sınıfı (Yükleniyor...)")
         self.cmb_hizmet_filtre.setMinimumWidth(180)
         self.cmb_hizmet_filtre.currentIndexChanged.connect(self._filtrele_tetikle)
 
-        # 3. Checkbox
+        # 3. Checkbox (Manuel stil kaldırıldı, tema varsayılanı kullanılacak)
         self.chk_pasif_goster = QCheckBox("Eski Personelleri Göster")
-        self.chk_pasif_goster.setStyleSheet("color: #ccc; font-weight: bold; margin-left: 10px;")
         self.chk_pasif_goster.stateChanged.connect(self._filtrele_tetikle)
 
-        # 4. Butonlar
+        # 4. Butonlar (Manuel renkler kaldırıldı, temaya bırakıldı)
+        # İstenirse özel ID'ler ile tema.py üzerinden stillendirilebilir.
         self.btn_yeni = OrtakAraclar.create_button(self, " + Yeni Personel", self._yeni_personel_ac)
-        self.btn_yeni.setObjectName("btn_yeni") # Yetki için ID
-        self.btn_yeni.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px;")
-
+        self.btn_yeni.setObjectName("btn_yeni") 
+        
         self.btn_yenile = OrtakAraclar.create_button(self, " Yenile", self._verileri_yenile)
         self.btn_yenile.setObjectName("btn_yenile")
-        self.btn_yenile.setStyleSheet("background-color: #0277bd; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px;")
 
         top_bar.addWidget(self.txt_ara)
         top_bar.addWidget(self.cmb_hizmet_filtre)
         top_bar.addWidget(self.chk_pasif_goster)
-        top_bar.addStretch() # Araya boşluk
+        top_bar.addStretch() 
         top_bar.addWidget(self.btn_yeni)
         top_bar.addWidget(self.btn_yenile)
         
         main_layout.addLayout(top_bar)
 
         # --- TABLO ---
-        # Headers: TC, Ad Soyad, Hizmet, Ünvan, Görev Yeri, Tel, Durum
         headers = ["TC Kimlik", "Ad Soyad", "Hizmet Sınıfı", "Ünvan", "Görev Yeri", "Cep Telefonu", "Durum"]
         self.table = OrtakAraclar.create_table(self, headers)
         self.table.cellDoubleClicked.connect(self._detay_ac)
@@ -236,12 +228,12 @@ class PersonelListesiPenceresi(QWidget):
         # --- FOOTER ---
         bottom_layout = QHBoxLayout()
         self.lbl_kayit_sayisi = QLabel("Toplam Kayıt: 0")
-        self.lbl_kayit_sayisi.setStyleSheet("color: #888; font-weight: bold;")
+        # Manuel stil temizlendi
         
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         self.progress.setFixedHeight(10)
-        self.progress.setStyleSheet("QProgressBar { border: none; background: #333; border-radius: 5px; } QProgressBar::chunk { background: #4dabf7; border-radius: 5px; }")
+        # Manuel stil temizlendi
         
         bottom_layout.addWidget(self.lbl_kayit_sayisi)
         bottom_layout.addStretch()
@@ -261,7 +253,7 @@ class PersonelListesiPenceresi(QWidget):
         self.cmb_hizmet_filtre.addItems(liste)
 
     def _verileri_yenile(self):
-        self.progress.setVisible(True); self.progress.setRange(0, 0) # Sonsuz döngü
+        self.progress.setVisible(True); self.progress.setRange(0, 0)
         self.btn_yenile.setEnabled(False)
         
         self.worker = VeriYukleWorker()
@@ -275,11 +267,9 @@ class PersonelListesiPenceresi(QWidget):
         
         if not veri_listesi: return
         
-        # İlk satır başlıklar
         self.basliklar = veri_listesi[0]
         self.ham_veri = veri_listesi[1:] 
         
-        # Durum sütunu kaçıncı sırada?
         try: self.idx_durum = self.basliklar.index("Durum")
         except ValueError: self.idx_durum = -1
             
@@ -295,9 +285,6 @@ class PersonelListesiPenceresi(QWidget):
         secilen_sinif = self.cmb_hizmet_filtre.currentText()
         pasifleri_goster = self.chk_pasif_goster.isChecked()
         
-        # Hizmet Sınıfı sütunu kaçıncı index? (Genelde 4. index: TC, Ad, Dogum, DogumTarihi, Hizmet)
-        # Tablo yapısına göre kontrol edilmeli. Standart Personel tablosunda:
-        # 0:TC, 1:Ad, 4:Hizmet, 5:Unvan, 6:GorevYeri, 9:Tel, X:Durum
         idx_hizmet = 4 
         
         filtrelenmis_veri = []
@@ -310,11 +297,9 @@ class PersonelListesiPenceresi(QWidget):
             if self.idx_durum != -1 and len(satir) > self.idx_durum:
                 durum_degeri = str(satir[self.idx_durum]).strip()
             
-            # Pasif filtreleme
             if not pasifleri_goster and durum_degeri == "Pasif":
                 continue
 
-            # Arama ve Kategori filtreleme
             if (text in satir_str) and ((secilen_sinif == "Tümü" or "Yükleniyor" in secilen_sinif) or (sinif_degeri == secilen_sinif)):
                 filtrelenmis_veri.append(satir)
                 
@@ -325,12 +310,9 @@ class PersonelListesiPenceresi(QWidget):
         self.table.setRowCount(len(veri_seti))
         self.lbl_kayit_sayisi.setText(f"Görüntülenen Kayıt: {len(veri_seti)}")
         
-        # Gösterilecek Sütunlar (Tablo header sırasına göre)
-        # TC(0), Ad(1), Hizmet(4), Ünvan(5), Görev(6), Tel(9), Durum(Dynamic)
         gosterilecek_indexler = [0, 1, 4, 5, 6, 9] 
         
         for i, row in enumerate(veri_seti):
-            # Durum belirle
             durum_val = row[self.idx_durum] if self.idx_durum != -1 and len(row) > self.idx_durum else "Aktif"
             
             col_counter = 0
@@ -340,21 +322,19 @@ class PersonelListesiPenceresi(QWidget):
                 self.table.setItem(i, col_counter, item)
                 col_counter += 1
             
-            # Son Sütun: Durum
             item_durum = QTableWidgetItem(str(durum_val))
+            # Renklendirmeyi koruduk çünkü bu iş mantığı sayılabilir
             if durum_val == "Pasif": 
                 item_durum.setForeground(Qt.red)
             else: 
                 item_durum.setForeground(Qt.green)
             self.table.setItem(i, col_counter, item_durum)
 
-            # Satır verisini sakla (Detay için)
             self.table.item(i, 0).setData(Qt.UserRole, row)
 
     def _sag_tik_menu(self, position):
         menu = QMenu()
-        # Stil tema.py'den gelir ama menu özel stil isteyebilir
-        menu.setStyleSheet("QMenu { background-color: #2b2b2b; color: white; border: 1px solid #555; } QMenu::item:selected { background-color: #0d47a1; }")
+        # Manuel stil kaldırıldı, tema.py yönetecek
         
         secili_satir = self.table.currentRow()
         if secili_satir >= 0:
@@ -365,11 +345,9 @@ class PersonelListesiPenceresi(QWidget):
                 tc_no = item_tc.text()
                 ad_soyad = item_ad.text()
                 
-                # Veriyi çek
                 row_data = item_tc.data(Qt.UserRole)
                 durum = row_data[self.idx_durum] if self.idx_durum != -1 else "Aktif"
                 
-                # --- AKSİYONLAR ---
                 act_detay = QAction("📝 Detay Görüntüle", self)
                 act_detay.triggered.connect(lambda: self._detay_ac(secili_satir, 0))
                 menu.addAction(act_detay)
@@ -392,10 +370,10 @@ class PersonelListesiPenceresi(QWidget):
         item = self.table.item(row, 0)
         if item:
             personel_data = item.data(Qt.UserRole)
-            # Modül varsa aç
             if 'PersonelDetayPenceresi' in globals():
                 self.detay_win = PersonelDetayPenceresi(personel_data, self.yetki, self.kullanici_adi)
                 self.detay_win.veri_guncellendi.connect(self._verileri_yenile)
+                # OrtakAraclar'da yoksa standart açılır, varsayım olarak korundu
                 OrtakAraclar.mdi_pencere_ac(self, self.detay_win, f"Detay: {personel_data[1]}")
             else:
                 show_info("Bilgi", "Detay modülü henüz yüklenmedi.", self)
@@ -427,7 +405,6 @@ class PersonelListesiPenceresi(QWidget):
             self.d_worker.start()
 
     def closeEvent(self, event):
-        """Çıkışta threadleri temizle"""
         for attr in ['worker', 'sabit_worker', 'u_worker', 'd_worker']:
             if hasattr(self, attr):
                 w = getattr(self, attr)
@@ -436,6 +413,10 @@ class PersonelListesiPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
     win = PersonelListesiPenceresi()
     win.show()
     sys.exit(app.exec())
