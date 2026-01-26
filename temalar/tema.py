@@ -689,4 +689,64 @@ class TemaYonetimi:
             image: none;
             border: none;
         }}
+        /* ... (Mevcut kodlarınızın devamına ekleyin) ... */
+
+            /* --------------------------------------------------- */
+            /* TARİH VE SAYI KUTULARI (SPIN BOX) OK DÜĞMELERİ */
+            /* --------------------------------------------------- */
+            
+            QAbstractSpinBox {
+                padding-right: 15px; /* Butonlar için sağda yer aç */
+            }
+
+            /* Yukarı ve Aşağı Butonlarının Genel Yapısı */
+            QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {
+                background-color: #2d2d2d; /* Buton Arka Planı (Panel rengiyle aynı veya farklı) */
+                border-left: 1px solid #444; /* Sol tarafa ince çizgi */
+                border-radius: 0px; /* Köşeli olsun */
+                width: 20px; /* Buton genişliği */
+            }
+            
+            /* Üst Buton (Yukarı) */
+            QAbstractSpinBox::up-button {
+                border-top-right-radius: 6px; /* Kutunun kavisini takip etsin */
+                margin-top: 1px;
+                margin-right: 1px;
+            }
+
+            /* Alt Buton (Aşağı) */
+            QAbstractSpinBox::down-button {
+                border-bottom-right-radius: 6px;
+                margin-bottom: 1px;
+                margin-right: 1px;
+            }
+
+            /* --- RENKLENDİRME --- */
+
+            /* Butonların üzerine gelince (HOVER) */
+            QAbstractSpinBox::up-button:hover, QAbstractSpinBox::down-button:hover {
+                background-color: #444444; /* Biraz daha açık gri */
+            }
+
+            /* Butonlara basılınca (PRESSED) - VURGU RENGİ */
+            QAbstractSpinBox::up-button:pressed, QAbstractSpinBox::down-button:pressed {
+                background-color: #60cdff; /* Windows Mavi Vurgusu */
+            }
+
+            /* OK SİMGELERİ (ARROWS) */
+            /* Okların rengini değiştirmek için Fusion temasında genellikle icon kullanılır 
+               ancak basitçe stil vermek için yukarıdaki arka plan değişimi yeterlidir. 
+               Eğer okların RENGİNİ de değiştirmek isterseniz image url kullanmak gerekir. 
+               Fusion teması otomatik beyaz ok koyar. */
+            
+            QAbstractSpinBox::up-arrow {
+                width: 8px;
+                height: 8px;
+                /* image: url(yukari_ok.png); -- Kendi ikonunuz varsa */
+            }
+            
+            QAbstractSpinBox::down-arrow {
+                width: 8px;
+                height: 8px;
+            }
         """

@@ -271,7 +271,7 @@ class PersonelEklePenceresi(QWidget):
         self.ui['baslama_tarihi'].setCalendarPopup(True)
         self.ui['baslama_tarihi'].setDisplayFormat("dd.MM.yyyy")
         self.ui['baslama_tarihi'].setDate(QDate.currentDate())
-        self.ui['baslama_tarihi'].setMinimumHeight(40)
+        self.ui['baslama_tarihi'].setMinimumHeight(20)
         
         self.ui['gorev_yeri'] = self._create_combo_no_label(grp_kadro)
         
