@@ -76,10 +76,15 @@ def db_ayarlarini_yukle():
         return {}
 
 def internet_kontrol():
-    """Basit bir DNS sorgusu ile interneti kontrol eder."""
+    """
+    Standart HTTP portu üzerinden internet bağlantısını kontrol eder.
+    Kurumsal ağlarda 8.8.8.8:53 engellenebileceği için bu yöntem daha güvenilirdir.
+    """
     try:
-        # Google DNS'ine bağlanmayı dene
-        socket.create_connection(("8.8.8.8", 53), timeout=3)
+        # Standart bir sunucuya port 80 (HTTP) üzerinden bağlanmayı dene
+        host = "www.google.com"
+        port = 80
+        socket.create_connection((host, port), timeout=3)
         return True
     except OSError:
         return False
