@@ -152,38 +152,6 @@ class TemaYonetimi:
             border: 1px solid #353535;
         }}
         
-        /* Spin Box Butonları */
-        QSpinBox::up-button, QDoubleSpinBox::up-button,
-        QSpinBox::down-button, QDoubleSpinBox::down-button {{
-            background-color: transparent;
-            border: none;
-            width: 16px;
-            subcontrol-origin: border;
-        }}
-        
-        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-            background-color: {r['panel_hover']};
-        }}
-        
-        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-            image: none;
-            border-left: 3px solid transparent;
-            border-right: 3px solid transparent;
-            border-bottom: 4px solid {r['metin_ikincil']};
-            width: 0px;
-            height: 0px;
-        }}
-        
-        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-            image: none;
-            border-left: 3px solid transparent;
-            border-right: 3px solid transparent;
-            border-top: 4px solid {r['metin_ikincil']};
-            width: 0px;
-            height: 0px;
-        }}
-        
         /* ==================== COMBOBOX ==================== */
         QComboBox {{
             background-color: {r['input_bg']};
@@ -679,74 +647,54 @@ class TemaYonetimi:
         }}
         
         QTreeWidget::branch:has-children:!has-siblings:closed,
-        QTreeWidget::branch:closed:has-children:has-siblings {{
-            image: none;
-            border: none;
-        }}
-        
+        QTreeWidget::branch:closed:has-children:has-siblings,
         QTreeWidget::branch:open:has-children:!has-siblings,
         QTreeWidget::branch:open:has-children:has-siblings {{
             image: none;
             border: none;
         }}
-        /* ... (Mevcut kodlarınızın devamına ekleyin) ... */
-
-            /* --------------------------------------------------- */
-            /* TARİH VE SAYI KUTULARI (SPIN BOX) OK DÜĞMELERİ */
-            /* --------------------------------------------------- */
-            
-            QAbstractSpinBox {
-                padding-right: 15px; /* Butonlar için sağda yer aç */
-            }
-
-            /* Yukarı ve Aşağı Butonlarının Genel Yapısı */
-            QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {
-                background-color: #2d2d2d; /* Buton Arka Planı (Panel rengiyle aynı veya farklı) */
-                border-left: 1px solid #444; /* Sol tarafa ince çizgi */
-                border-radius: 0px; /* Köşeli olsun */
-                width: 20px; /* Buton genişliği */
-            }
-            
-            /* Üst Buton (Yukarı) */
-            QAbstractSpinBox::up-button {
-                border-top-right-radius: 6px; /* Kutunun kavisini takip etsin */
-                margin-top: 1px;
-                margin-right: 1px;
-            }
-
-            /* Alt Buton (Aşağı) */
-            QAbstractSpinBox::down-button {
-                border-bottom-right-radius: 6px;
-                margin-bottom: 1px;
-                margin-right: 1px;
-            }
-
-            /* --- RENKLENDİRME --- */
-
-            /* Butonların üzerine gelince (HOVER) */
-            QAbstractSpinBox::up-button:hover, QAbstractSpinBox::down-button:hover {
-                background-color: #444444; /* Biraz daha açık gri */
-            }
-
-            /* Butonlara basılınca (PRESSED) - VURGU RENGİ */
-            QAbstractSpinBox::up-button:pressed, QAbstractSpinBox::down-button:pressed {
-                background-color: #60cdff; /* Windows Mavi Vurgusu */
-            }
-
-            /* OK SİMGELERİ (ARROWS) */
-            /* Okların rengini değiştirmek için Fusion temasında genellikle icon kullanılır 
-               ancak basitçe stil vermek için yukarıdaki arka plan değişimi yeterlidir. 
-               Eğer okların RENGİNİ de değiştirmek isterseniz image url kullanmak gerekir. 
-               Fusion teması otomatik beyaz ok koyar. */
-            
-            QAbstractSpinBox::up-arrow {
-                width: 8px;
-                height: 8px;
-                /* image: url(yukari_ok.png); -- Kendi ikonunuz varsa */
-            }
-            
-            QAbstractSpinBox::down-arrow {
-                width: 8px;
-                height: 8px;
-            }
+        
+        /* ==================== SPIN BOX OKLARI ==================== */
+        
+        QAbstractSpinBox {{
+            padding-right: 15px; 
+        }}
+        
+        /* Yukarı ve Aşağı Butonlarının Genel Yapısı */
+        QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {{
+            background-color: {r['panel']};
+            border-left: 1px solid {r['kenarlık_acik']};
+            border-radius: 0px;
+            width: 20px;
+        }}
+        
+        /* Üst Buton (Yukarı) */
+        QAbstractSpinBox::up-button {{
+            border-top-right-radius: 4px;
+            margin-top: 1px;
+            margin-right: 1px;
+        }}
+        
+        /* Alt Buton (Aşağı) */
+        QAbstractSpinBox::down-button {{
+            border-bottom-right-radius: 4px;
+            margin-bottom: 1px;
+            margin-right: 1px;
+        }}
+        
+        /* Hover Durumu */
+        QAbstractSpinBox::up-button:hover, QAbstractSpinBox::down-button:hover {{
+            background-color: {r['panel_hover']};
+        }}
+        
+        /* Pressed Durumu */
+        QAbstractSpinBox::up-button:pressed, QAbstractSpinBox::down-button:pressed {{
+            background-color: {r['vurgu']};
+        }}
+        
+        /* Oklar */
+        QAbstractSpinBox::up-arrow, QAbstractSpinBox::down-arrow {{
+            width: 8px;
+            height: 8px;
+        }}
         """

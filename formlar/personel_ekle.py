@@ -218,7 +218,7 @@ class PersonelEklePenceresi(QWidget):
         self.ui['dogum_tarihi'] = QDateEdit()
         self.ui['dogum_tarihi'].setCalendarPopup(True)
         self.ui['dogum_tarihi'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['dogum_tarihi'].setMinimumHeight(20) 
+        self.ui['dogum_tarihi'].setMinimumHeight(40) 
         
         row_dogum.addWidget(self._wrap_label_widget("Doğum Yeri:", self.ui['dogum_yeri']))
         row_dogum.addWidget(self._wrap_label_widget("Doğum Tarihi:", self.ui['dogum_tarihi']))
@@ -271,7 +271,7 @@ class PersonelEklePenceresi(QWidget):
         self.ui['baslama_tarihi'].setCalendarPopup(True)
         self.ui['baslama_tarihi'].setDisplayFormat("dd.MM.yyyy")
         self.ui['baslama_tarihi'].setDate(QDate.currentDate())
-        self.ui['baslama_tarihi'].setMinimumHeight(20)
+        self.ui['baslama_tarihi'].setMinimumHeight(40)
         
         self.ui['gorev_yeri'] = self._create_combo_no_label(grp_kadro)
         
@@ -284,18 +284,16 @@ class PersonelEklePenceresi(QWidget):
         
         right_layout.addWidget(grp_kadro)
 
-       # 4. EĞİTİM BİLGİLERİ (YAN YANA GRUPLAR)
+        # 4. EĞİTİM BİLGİLERİ (YAN YANA GRUPLAR)
         grp_egitim_ana = OrtakAraclar.create_group_box(content_widget, "Eğitim Bilgileri")
         layout_egitim_ana = QHBoxLayout(grp_egitim_ana)
-        
-        # 🟢 GÜNCELLEME: Üstten 35px boşluk bırakılarak başlıkların okunması sağlandı
-        layout_egitim_ana.setContentsMargins(10, 20, 10, 10) 
-        
+        # Başlıkların okunması için üstten boşluk
+        layout_egitim_ana.setContentsMargins(10, 25, 10, 10)
         layout_egitim_ana.setSpacing(20)
         
         # --- 1. Üniversite Grubu ---
-        grp_uni1 = QGroupBox("Üniversite / Yüksekokul")
-        grp_uni1.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: 1px; left: 10px; }")
+        grp_uni1 = QGroupBox("Lise / Lisans / Önlisans")
+        grp_uni1.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: -4px; left: 10px; }")
         l_uni1 = QVBoxLayout(grp_uni1)
         
         self.ui['okul1'] = self._create_editable_combo(grp_uni1)
@@ -304,7 +302,11 @@ class PersonelEklePenceresi(QWidget):
         l_uni1.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte1']))
         
         row_u1_2 = QHBoxLayout()
-        self.ui['mezun_tarihi1'] = QDateEdit(); self.ui['mezun_tarihi1'].setDisplayFormat("dd.MM.yyyy"); self.ui['mezun_tarihi1'].setMinimumHeight(40)
+        # 🟢 GÜNCELLEME: DateEdit -> LineEdit + Mask
+        self.ui['mezun_tarihi1'] = OrtakAraclar.create_line_edit(grp_uni1)
+        self.ui['mezun_tarihi1'].setInputMask("99.99.9999")
+        self.ui['mezun_tarihi1'].setPlaceholderText("GG.AA.YYYY")
+        
         self.ui['diploma_no1'] = OrtakAraclar.create_line_edit(grp_uni1)
         row_u1_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi1']))
         row_u1_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no1']))
@@ -315,8 +317,8 @@ class PersonelEklePenceresi(QWidget):
         layout_egitim_ana.addWidget(grp_uni1)
 
         # --- 2. Üniversite Grubu ---
-        grp_uni2 = QGroupBox("Yüksek Lisans / Lisans / Lisans Tamamlama")
-        grp_uni2.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: 1px; left: 10px; }")
+        grp_uni2 = QGroupBox("Önlisans / Yüksek Lisans / Lisans Tamamlama")
+        grp_uni2.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: -4px; left: 10px; }")
         l_uni2 = QVBoxLayout(grp_uni2)
         
         self.ui['okul2'] = self._create_editable_combo(grp_uni2)
@@ -325,7 +327,11 @@ class PersonelEklePenceresi(QWidget):
         l_uni2.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte2']))
         
         row_u2_2 = QHBoxLayout()
-        self.ui['mezun_tarihi2'] = QDateEdit(); self.ui['mezun_tarihi2'].setDisplayFormat("dd.MM.yyyy"); self.ui['mezun_tarihi2'].setMinimumHeight(40)
+        # 🟢 GÜNCELLEME: DateEdit -> LineEdit + Mask
+        self.ui['mezun_tarihi2'] = OrtakAraclar.create_line_edit(grp_uni2)
+        self.ui['mezun_tarihi2'].setInputMask("99.99.9999")
+        self.ui['mezun_tarihi2'].setPlaceholderText("GG.AA.YYYY")
+        
         self.ui['diploma_no2'] = OrtakAraclar.create_line_edit(grp_uni2)
         row_u2_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi2']))
         row_u2_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no2']))

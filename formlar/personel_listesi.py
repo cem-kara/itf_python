@@ -190,7 +190,7 @@ class PersonelListesiPenceresi(QWidget):
         # 2. Filtre
         self.cmb_hizmet_filtre = OrtakAraclar.create_combo_box(self)
         self.cmb_hizmet_filtre.addItem("Hizmet Sınıfı (Yükleniyor...)")
-        self.cmb_hizmet_filtre.setMinimumWidth(180)
+        self.cmb_hizmet_filtre.setMinimumWidth(250)
         self.cmb_hizmet_filtre.currentIndexChanged.connect(self._filtrele_tetikle)
 
         # 3. Checkbox (Manuel stil kaldırıldı, tema varsayılanı kullanılacak)
