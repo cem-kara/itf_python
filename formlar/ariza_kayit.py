@@ -10,31 +10,37 @@ from PySide6.QtGui import QPixmap, QCursor, QFont, QColor
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QLabel, QLineEdit, QComboBox, QDateEdit, QPushButton, QMessageBox,
                                QScrollArea, QFrame, QFileDialog, QGridLayout, 
-                               QProgressBar, QGraphicsDropShadowEffect, QTextEdit, QMdiSubWindow, QCompleter)
+                               QProgressBar, QGraphicsDropShadowEffect, QTextEdit, QMdiSubWindow, 
+                               QCompleter, QGroupBox, QSizePolicy)
 
 # --- LOGLAMA ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ArizaKayit")
 
-# --- ANA KLASÖR BAĞLANTISI ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-
-from araclar.yetki_yonetimi import YetkiYoneticisi
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir, GoogleDriveService
     from araclar.ortak_araclar import show_info, show_error, pencereyi_kapat
-except ImportError:
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
+    # Fallback
     def veritabani_getir(vt, sayfa): return None
     def show_info(t, m, p): print(m)
     def show_error(t, m, p): print(m)
     def pencereyi_kapat(w): w.close()
     class GoogleDriveService:
         def upload_file(self, a, b): return None
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # --- AYARLAR ---
 DRIVE_KLASORLERI = {
@@ -150,40 +156,46 @@ class ModernInputGroup(QWidget):
         
         if isinstance(widget, QTextEdit):
             self.widget.setMinimumHeight(100)
-            self.widget.setStyleSheet("""
-                QTextEdit { background-color: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 6px; padding: 8px; color: #e0e0e0; font-size: 14px; }
-                QTextEdit:focus { border: 1px solid #4dabf7; }
-            """)
-        else:
-            self.widget.setStyleSheet("""
-                QLineEdit, QComboBox, QDateEdit { background-color: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 6px; padding: 8px; color: #e0e0e0; font-size: 14px; }
-                QLineEdit:focus, QComboBox:focus, QDateEdit:focus { border: 1px solid #4dabf7; background-color: #333333; }
-                QLineEdit:read-only { background-color: #202020; border: none; color: #999; font-style: italic; }
-                QComboBox QAbstractItemView { background-color: #2b2b2b; color: #e0e0e0; selection-background-color: #4dabf7; }
-            """)
+        
+        # Manuel stiller kaldırıldı, TemaYonetimi yönetecek
         
         layout.addWidget(self.lbl)
         layout.addWidget(self.widget)
 
-class InfoCard(QFrame):
+class InfoCard(QGroupBox):
+    """
+    Görsel gruplama sağlayan kart bileşeni (QGroupBox).
+    """
     def __init__(self, title, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet("InfoCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333; }")
+        super().__init__(title, parent)
+        
+        self.setStyleSheet("""
+            QGroupBox {
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 20px; 
+                font-weight: bold;
+                color: #ff5252; /* Arıza olduğu için kırmızımsı başlık */
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 10px;
+                left: 10px;
+            }
+        """)
+        
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
+        shadow.setBlurRadius(15)
         shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 100))
         self.setGraphicsEffect(shadow)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setContentsMargins(15, 20, 15, 15)
         self.layout.setSpacing(15)
-        
-        if title:
-            lbl_title = QLabel(title)
-            lbl_title.setStyleSheet("color: #ff5252; font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 5px;")
-            self.layout.addWidget(lbl_title)
 
     def add_widget(self, widget):
         self.layout.addWidget(widget)
@@ -195,7 +207,6 @@ class InfoCard(QFrame):
 # 3. ANA PENCERE: ARIZA KAYIT
 # =============================================================================
 class ArizaKayitPenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -203,7 +214,7 @@ class ArizaKayitPenceresi(QWidget):
         
         self.setWindowTitle("Yeni Arıza Kaydı")
         self.resize(1000, 750)
-        self.setStyleSheet("background-color: #121212;")
+        # Manuel arka plan kaldırıldı
 
         self.inputs = {}
         self.control_buttons = {}
@@ -211,7 +222,7 @@ class ArizaKayitPenceresi(QWidget):
         
         self.setup_ui()
         
-        # 🟢 DEĞİŞİKLİK 2: Yetki
+        # Yetki
         YetkiYoneticisi.uygula(self, "ariza_kayit")
         
         self.baslangic_yukle()
@@ -224,12 +235,13 @@ class ArizaKayitPenceresi(QWidget):
         # Header
         header = QFrame()
         header.setFixedHeight(60)
-        header.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #333;")
+        header.setObjectName("panel_frame") 
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(25, 0, 25, 0)
         
         lbl_baslik = QLabel("Arıza Bildirim Formu")
         lbl_baslik.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        # Renk temaya bırakıldı veya özel renk korunabilir
         lbl_baslik.setStyleSheet("color: #ff5252;")
         
         self.progress = QProgressBar()
@@ -249,7 +261,7 @@ class ArizaKayitPenceresi(QWidget):
         scroll.setStyleSheet("background: transparent;")
         
         content = QWidget()
-        content.setStyleSheet("background: transparent;")
+        # content.setStyleSheet("background: transparent;")
         grid = QGridLayout(content)
         grid.setContentsMargins(25, 25, 25, 25)
         grid.setSpacing(25)
@@ -259,7 +271,8 @@ class ArizaKayitPenceresi(QWidget):
         
         self.add_modern_input(card_cihaz, "Arıza Kayıt No (Otomatik)", "ArizaID")
         self.inputs["ArizaID"].setReadOnly(True)
-        self.inputs["ArizaID"].setStyleSheet("background-color: #202020; color: #ff5252; font-weight: bold; border: none;")
+        # Sadece ID alanı için özel stil
+        self.inputs["ArizaID"].setStyleSheet("background-color: #202020; color: #ff5252; font-weight: bold;")
         
         self.add_modern_input(card_cihaz, "İlgili Cihazı Seçiniz", "CihazID", "combo", stretch=1)
         self.inputs["CihazID"].setEditable(True)
@@ -286,8 +299,6 @@ class ArizaKayitPenceresi(QWidget):
         
         self.add_modern_input(card_detay, "Konu / Başlık", "Konu")
         
-        lbl_aciklama = QLabel("Arıza Açıklaması")
-        lbl_aciklama.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold;")
         txt_aciklama = QTextEdit()
         txt_aciklama.setPlaceholderText("Arızayı detaylı bir şekilde açıklayınız...")
         grp_aciklama = ModernInputGroup("Arıza Açıklaması", txt_aciklama)
@@ -306,24 +317,22 @@ class ArizaKayitPenceresi(QWidget):
         # Footer
         footer = QFrame()
         footer.setFixedHeight(80)
-        footer.setStyleSheet("background-color: #1e1e1e; border-top: 1px solid #333;")
+        footer.setObjectName("panel_frame")
         foot_lay = QHBoxLayout(footer)
         foot_lay.setContentsMargins(30, 15, 30, 15)
         
         self.btn_iptal = QPushButton("İptal")
-        self.btn_iptal.setObjectName("btn_iptal") # Yetki için
+        self.btn_iptal.setObjectName("btn_iptal")
         self.btn_iptal.setFixedSize(140, 45)
         self.btn_iptal.setCursor(Qt.PointingHandCursor)
-        self.btn_iptal.setStyleSheet("""
-            QPushButton { background: transparent; border: 1px solid #555; color: #aaa; border-radius: 8px; font-weight: bold; }
-            QPushButton:hover { background: #333; color: white; }
-        """)
         self.btn_iptal.clicked.connect(self.pencereyi_kapat)
         
         self.btn_kaydet = QPushButton("⚠️ Arıza Kaydı Oluştur")
-        self.btn_kaydet.setObjectName("btn_kaydet") # Yetki için
+        self.btn_kaydet.setObjectName("btn_kaydet") # Tema ID (Genellikle yeşil olur ama burası arıza kaydı)
         self.btn_kaydet.setFixedSize(220, 45)
         self.btn_kaydet.setCursor(Qt.PointingHandCursor)
+        # Arıza kaydı olduğu için kırmızı stil özel olarak korunabilir veya temadan 'btn_danger' vb. kullanılabilir.
+        # Şimdilik manuel stil yerine, temaya uygun kırmızı tanımını bırakıyorum (tema yoksa çalışır).
         self.btn_kaydet.setStyleSheet("""
             QPushButton { background-color: #d32f2f; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; }
             QPushButton:hover { background-color: #b71c1c; }
@@ -363,12 +372,12 @@ class ArizaKayitPenceresi(QWidget):
         edt = QLineEdit()
         edt.setReadOnly(True)
         edt.setPlaceholderText("Dosya seçilmedi")
-        edt.setStyleSheet("background: #2b2b2b; border: 1px solid #333; border-radius: 6px; padding: 5px; color: #888;")
+        # Stil temaya bırakıldı
         
         btn = QPushButton("📎 Ekle")
         btn.setFixedSize(60, 35)
         btn.setCursor(Qt.PointingHandCursor)
-        btn.setStyleSheet("background: #444; color: white; border-radius: 4px; border:none;")
+        btn.setObjectName("btn_standart") # Tema ID
         btn.clicked.connect(lambda: self.dosya_sec(key, edt))
         
         lay.addWidget(edt)
@@ -458,7 +467,6 @@ class ArizaKayitPenceresi(QWidget):
         self.btn_kaydet.setEnabled(True)
         show_error("Hata", f"Kayıt Hatası: {hata}", self)
 
-    # 🟢 DEĞİŞİKLİK 3: Thread Güvenliği
     def closeEvent(self, event):
         if hasattr(self, 'loader') and self.loader.isRunning():
             self.loader.quit()
@@ -470,6 +478,13 @@ class ArizaKayitPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
+        app.setStyle("Fusion")
+        
     win = ArizaKayitPenceresi()
     win.show()
     sys.exit(app.exec())

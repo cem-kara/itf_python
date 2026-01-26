@@ -7,7 +7,8 @@ import pandas as pd
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                                QTableView, QHeaderView, QLineEdit, QPushButton, 
                                QLabel, QMessageBox, QMdiSubWindow, QProgressBar, 
-                               QAbstractItemView, QMdiArea, QComboBox, QFrame)
+                               QAbstractItemView, QMdiArea, QComboBox, QFrame,
+                               QGroupBox, QSizePolicy)
 from PySide6.QtCore import Qt, QThread, Signal, QAbstractTableModel
 from PySide6.QtGui import QFont, QColor
 
@@ -21,17 +22,24 @@ root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir
     from araclar.ortak_araclar import show_error, mdi_pencere_ac
 except ImportError as e:
     print(f"Modül Hatası: {e}")
+    # Fallback tanımlar
     def veritabani_getir(vt_tipi, sayfa_adi): return None
     def show_error(t, m, p): print(m)
     def mdi_pencere_ac(parent, form, title): form.show()
+    class YetkiYoneticisi:
+        @staticmethod
+        def uygula(self, kod): pass
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # =============================================================================
 # 1. PANDAS VERİ MODELİ (GELİŞMİŞ BAŞLIK YÖNETİMİ)
@@ -133,7 +141,6 @@ class VeriYukleyici(QThread):
 # 3. GÖRÜNÜM (UI)
 # =============================================================================
 class ArizaListesiPenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -141,14 +148,18 @@ class ArizaListesiPenceresi(QWidget):
         
         self.setWindowTitle("Arıza Takip Listesi")
         self.resize(1200, 750)
-        self.setStyleSheet("background-color: #121212; color: #e0e0e0;")
         
         self.full_df = pd.DataFrame()
         self.filtered_df = pd.DataFrame()
         
         self.setup_ui()
         
-        # 🟢 DEĞİŞİKLİK 2: Yetki
+        # Tema Uygula
+        try:
+            TemaYonetimi.tema_uygula(self)
+        except AttributeError: pass
+        
+        # Yetki Uygula
         YetkiYoneticisi.uygula(self, "ariza_listesi")
         
         self.verileri_yenile()
@@ -158,58 +169,55 @@ class ArizaListesiPenceresi(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
         
-        # --- HEADER ---
-        top_frame = QFrame()
-        top_frame.setFixedHeight(70)
-        top_frame.setStyleSheet("QFrame { background-color: #1e1e1e; border-radius: 8px; border: 1px solid #333; }")
-        top_layout = QHBoxLayout(top_frame)
-        top_layout.setContentsMargins(15, 10, 15, 10)
-        top_layout.setSpacing(15)
+        # --- HEADER (GROUPBOX OLARAK DÜZENLENDİ) ---
+        grp_filtre = QGroupBox("Filtreleme ve İşlemler")
+        grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         
-        lbl_baslik = QLabel("Arıza Takip")
-        lbl_baslik.setStyleSheet("font-size: 18px; font-weight: bold; color: #ff5252; border: none;")
+        top_layout = QHBoxLayout(grp_filtre)
+        top_layout.setContentsMargins(15, 20, 15, 15)
+        top_layout.setSpacing(15)
         
         self.combo_durum = QComboBox()
         self.combo_durum.addItems(["Tüm Durumlar", "Açık", "İşlemde", "Kapalı", "Beklemede"])
         self.combo_durum.setMinimumWidth(130)
-        self.combo_durum.setStyleSheet(self.combo_style())
         self.combo_durum.currentTextChanged.connect(self.filtre_uygula)
         
         self.combo_oncelik = QComboBox()
         self.combo_oncelik.addItems(["Tüm Öncelikler", "Acil (Kritik)", "Yüksek", "Normal", "Düşük"])
         self.combo_oncelik.setMinimumWidth(130)
-        self.combo_oncelik.setStyleSheet(self.combo_style())
         self.combo_oncelik.currentTextChanged.connect(self.filtre_uygula)
 
         self.txt_ara = QLineEdit()
         self.txt_ara.setPlaceholderText("ID, Cihaz, Konu veya Personel ara...")
-        self.txt_ara.setStyleSheet("QLineEdit { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #2b2b2b; color: white; min-width: 200px; } QLineEdit:focus { border: 1px solid #ff5252; }")
         self.txt_ara.textChanged.connect(self.filtre_uygula)
         
-        # 🟢 DEĞİŞİKLİK 3: Yeni Ekle Butonu
+        # Yeni Ekle Butonu
         self.btn_yeni = QPushButton(" + Yeni Kayıt")
-        self.btn_yeni.setObjectName("btn_yeni") # Yetki için
-        self.btn_yeni.setFixedSize(120, 35)
+        self.btn_yeni.setObjectName("btn_yeni") # Yeşil Stil (Tema)
+        #self.btn_yeni.setFixedSize(120, 35)
         self.btn_yeni.setCursor(Qt.PointingHandCursor)
+        # Özel stil korundu (Yeşil buton)
+        self.btn_yeni.setStyleSheet("background-color: #28a745; color: white; font-weight: bold;")
         self.btn_yeni.clicked.connect(self.yeni_kayit_ac)
-        self.btn_yeni.setStyleSheet("QPushButton { background-color: #d32f2f; color: white; border-radius: 4px; font-weight: bold; border: none; } QPushButton:hover { background-color: #b71c1c; }")
 
+        # Yenile Butonu
         self.btn_yenile = QPushButton("⟳")
-        self.btn_yenile.setObjectName("btn_yenile") # Yetki için
-        self.btn_yenile.setFixedSize(35, 35)
+        self.btn_yenile.setObjectName("btn_yenile")
+        #self.btn_yenile.setFixedSize(35, 35)
         self.btn_yenile.setCursor(Qt.PointingHandCursor)
+        self.btn_yenile.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; font-size: 20px;")
         self.btn_yenile.clicked.connect(self.verileri_yenile)
-        self.btn_yenile.setStyleSheet("QPushButton { background-color: #333; color: white; border-radius: 4px; font-size: 16px; border: 1px solid #444; } QPushButton:hover { background-color: #444; }")
         
-        top_layout.addWidget(lbl_baslik)
+        top_layout.addWidget(QLabel("Durum:"))
         top_layout.addWidget(self.combo_durum)
+        top_layout.addWidget(QLabel("Öncelik:"))
         top_layout.addWidget(self.combo_oncelik)
         top_layout.addStretch()
         top_layout.addWidget(self.txt_ara)
-        top_layout.addWidget(self.btn_yeni) # Yeni Ekle butonu
+        top_layout.addWidget(self.btn_yeni)
         top_layout.addWidget(self.btn_yenile)
         
-        main_layout.addWidget(top_frame)
+        main_layout.addWidget(grp_filtre)
         
         # Progress
         self.progress = QProgressBar()
@@ -227,15 +235,12 @@ class ArizaListesiPenceresi(QWidget):
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tablo.verticalHeader().setVisible(False)
         self.tablo.doubleClicked.connect(self.satir_tiklandi)
-        self.tablo.setStyleSheet("QTableView { background-color: #1e1e1e; gridline-color: #333; border: none; selection-background-color: #b71c1c; selection-color: white; } QHeaderView::section { background-color: #2b2b2b; color: #ccc; padding: 8px; border: none; border-bottom: 2px solid #ff5252; font-weight: bold; } QTableView::item { padding: 5px; }")
+        # Manuel stiller temizlendi, tema yönetecek
         main_layout.addWidget(self.tablo)
         
         self.lbl_info = QLabel("Hazır")
         self.lbl_info.setStyleSheet("color: #777; font-size: 12px; margin-left: 5px;")
         main_layout.addWidget(self.lbl_info)
-
-    def combo_style(self):
-        return "QComboBox { background-color: #2b2b2b; border: 1px solid #444; border-radius: 4px; padding: 5px; color: #e0e0e0; } QComboBox::drop-down { border: none; }"
 
     def verileri_yenile(self):
         self.progress.setVisible(True)
@@ -292,11 +297,13 @@ class ArizaListesiPenceresi(QWidget):
     def satir_tiklandi(self, index):
         try:
             row = index.row()
-            # ID sütununu bul
-            if "ArizaID" in self.filtered_df.columns:
-                ariza_id = str(self.filtered_df.iloc[row]["ArizaID"])
+            col_name = "ArizaID"
+            
+            if col_name in self.filtered_df.columns:
+                # GÜNCELLEME: FutureWarning önlendi
+                col_index = self.filtered_df.columns.get_loc(col_name)
+                ariza_id = str(self.filtered_df.iloc[row, col_index])
             else:
-                # Sütun adı farklıysa veya index 0 varsayımı
                 ariza_id = str(self.filtered_df.iloc[row, 0])
                 
             self.detay_ac(ariza_id)
@@ -307,7 +314,6 @@ class ArizaListesiPenceresi(QWidget):
         try:
             from formlar.ariza_islem import ArizaIslemPenceresi
             # Yetki ve kullanıcı adını iletiyoruz
-            # ana_pencere=self diyerek veri güncellendiğinde listeyi yenilemesini sağlıyoruz
             detay_form = ArizaIslemPenceresi(ariza_id, yetki=self.yetki, kullanici_adi=self.kullanici_adi, ana_pencere=self)
             mdi_pencere_ac(self, detay_form, f"Arıza Detay: {ariza_id}")
         except ImportError:
@@ -324,7 +330,6 @@ class ArizaListesiPenceresi(QWidget):
         except ImportError:
             show_error("Modül Eksik", "Ariza kayıt modülü (ariza_kayit.py) bulunamadı.", self)
 
-    # 🟢 DEĞİŞİKLİK 4: Thread Güvenliği
     def closeEvent(self, event):
         if hasattr(self, 'worker') and self.worker.isRunning():
             self.worker.quit()
@@ -333,8 +338,13 @@ class ArizaListesiPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    from temalar.tema import TemaYonetimi
-    TemaYonetimi.uygula_fusion_dark(app)
+    
+    try:
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
+        app.setStyle("Fusion")
+        
     win = ArizaListesiPenceresi()
     win.show()
     sys.exit(app.exec())

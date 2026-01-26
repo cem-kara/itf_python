@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QLineEdit, QPushButton, QLabel, QMessageBox, 
                                QComboBox, QDateEdit, QTextEdit, QFileDialog, 
                                QProgressBar, QFrame, QGraphicsDropShadowEffect, 
-                               QCompleter, QAbstractItemView)
+                               QCompleter, QAbstractItemView, QGroupBox, QSizePolicy)
 from PySide6.QtCore import Qt, QDate, QUrl, QThread, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QFont
 
@@ -23,25 +23,30 @@ logger = logging.getLogger("PeriyodikBakim")
 # --- AYARLAR ---
 DRIVE_KLASOR_ID = "1KIYRhomNGppMZCXbqyngT2kH0X8c-GEK" 
 
-# --- ANA KLASÖR BAĞLANTISI ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-
-from araclar.yetki_yonetimi import YetkiYoneticisi
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir, GoogleDriveService
     from araclar.ortak_araclar import show_info, show_error, pencereyi_kapat
-except ImportError:
-    def veritabani_getir(vt_tipi, sayfa_adi): return None
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
+    # Fallback
+    def veritabani_getir(vt, sayfa): return None
     def show_info(t, m, p): print(m)
     def show_error(t, m, p): print(m)
     def pencereyi_kapat(w): w.close()
     class GoogleDriveService:
         def upload_file(self, a, b): return None
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # --- YARDIMCI FONKSİYONLAR ---
 def ay_ekle(kaynak_tarih, ay_sayisi):
@@ -168,46 +173,47 @@ class ModernInputGroup(QWidget):
         self.widget.setMinimumHeight(40)
         self.widget.setMinimumWidth(150)
         
-        base_style = """
-            background-color: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 6px; 
-            padding: 8px; color: #e0e0e0; font-size: 14px;
-        """
-        focus_style = "border: 1px solid #4dabf7;"
-        disabled_style = "background-color: #202020; color: #777; border: 1px dashed #444;"
-
+        # Manuel stiller kaldırıldı, TemaYonetimi yönetecek
         if isinstance(widget, QTextEdit):
             self.widget.setMinimumHeight(80)
-            self.widget.setStyleSheet(f"""
-                QTextEdit {{ {base_style} }} 
-                QTextEdit:focus {{ {focus_style} }}
-                QTextEdit:disabled {{ {disabled_style} }}
-            """)
-        else:
-            self.widget.setStyleSheet(f"""
-            QLineEdit, QComboBox, QDateEdit {{ {base_style} min-height: 18px; }}
-            QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ {focus_style} background-color: #333333; }}
-            QLineEdit:read-only {{ {disabled_style} border: none; }}
-            """)
         
         layout.addWidget(self.lbl)
         layout.addWidget(self.widget)
 
-class InfoCard(QFrame):
+class InfoCard(QGroupBox):
+    """
+    Görsel gruplama sağlayan kart bileşeni (QGroupBox).
+    """
     def __init__(self, title, parent=None, color="#4dabf7"):
-        super().__init__(parent)
-        self.setStyleSheet("InfoCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333; }")
+        super().__init__(title, parent)
+        
+        self.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 20px; 
+                font-weight: bold;
+                color: {color}; 
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 10px;
+                left: 10px;
+            }}
+        """)
+        
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20); shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 100))
         self.setGraphicsEffect(shadow)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setContentsMargins(15, 20, 15, 15)
         self.layout.setSpacing(15)
-        
-        if title:
-            lbl_title = QLabel(title)
-            lbl_title.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px;")
-            self.layout.addWidget(lbl_title)
 
     def add_widget(self, widget): self.layout.addWidget(widget)
     def add_layout(self, layout): self.layout.addLayout(layout)
@@ -216,7 +222,6 @@ class InfoCard(QFrame):
 # 3. ANA PENCERE
 # =============================================================================
 class PeriyodikBakimPenceresi(QWidget):
-    # 🟢 DEĞİŞİKLİK 1: Parametreler eklendi
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
         self.yetki = yetki
@@ -224,7 +229,6 @@ class PeriyodikBakimPenceresi(QWidget):
         
         self.setWindowTitle("Periyodik Bakım Yönetimi")
         self.resize(1300, 800)
-        self.setStyleSheet("background-color: #121212; color: #e0e0e0;")
         
         self.inputs = {}
         self.control_buttons = {} 
@@ -238,7 +242,12 @@ class PeriyodikBakimPenceresi(QWidget):
         
         self.setup_ui()
         
-        # 🟢 DEĞİŞİKLİK 2: Yetki Uygulama
+        # Tema Uygulama
+        try:
+            TemaYonetimi.tema_uygula(self)
+        except AttributeError: pass
+        
+        # Yetki Uygulama
         YetkiYoneticisi.uygula(self, "periyodik_bakim")
         
         self.verileri_yukle()
@@ -308,6 +317,7 @@ class PeriyodikBakimPenceresi(QWidget):
         self.btn_kaydet.setObjectName("btn_kaydet") # Yetki için
         self.btn_kaydet.setCursor(Qt.PointingHandCursor)
         self.btn_kaydet.setMinimumHeight(50)
+        # Özel yeşil stil (Tema dışı)
         self.btn_kaydet.setStyleSheet("""
             QPushButton { background-color: #2e7d32; color: white; border-radius: 8px; font-weight: bold; font-size: 14px; }
             QPushButton:hover { background-color: #388e3c; }
@@ -326,26 +336,29 @@ class PeriyodikBakimPenceresi(QWidget):
         # --- SAĞ PANEL (LİSTE) ---
         sag_panel = QVBoxLayout()
         
-        filter_bar = QHBoxLayout()
-        lbl_baslik = QLabel("Bakım Takvimi")
-        lbl_baslik.setStyleSheet("font-size: 20px; font-weight: bold; color: #4dabf7;")
+        # HEADER (GroupBox ile)
+        grp_filtre = QGroupBox("Bakım Takvimi")
+        grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        grp_filtre.setStyleSheet("QGroupBox { font-size: 14px; font-weight: bold; color: #4dabf7; margin-top: 10px; }")
+        
+        filter_layout = QHBoxLayout(grp_filtre)
         
         self.cmb_filtre_ay = QComboBox()
         self.cmb_filtre_ay.addItems(["Tüm Aylar"] + list(calendar.month_name)[1:])
         self.cmb_filtre_ay.setFixedWidth(150)
-        self.cmb_filtre_ay.setStyleSheet("background: #1e1e1e; color: white; padding: 5px; border: 1px solid #333;")
+        # Stil temaya bırakıldı
         self.cmb_filtre_ay.currentIndexChanged.connect(self.tabloyu_guncelle)
         
         btn_yenile = QPushButton("⟳")
         btn_yenile.setFixedSize(35, 35)
         btn_yenile.clicked.connect(self.verileri_yukle)
-        btn_yenile.setStyleSheet("background: #333; color: white; border: 1px solid #444; border-radius: 4px;")
+        # Stil temaya bırakıldı
         
-        filter_bar.addWidget(lbl_baslik)
-        filter_bar.addStretch()
-        filter_bar.addWidget(self.cmb_filtre_ay)
-        filter_bar.addWidget(btn_yenile)
-        sag_panel.addLayout(filter_bar)
+        filter_layout.addStretch()
+        filter_layout.addWidget(QLabel("Ay Filtresi:"))
+        filter_layout.addWidget(self.cmb_filtre_ay)
+        filter_layout.addWidget(btn_yenile)
+        sag_panel.addWidget(grp_filtre)
         
         self.tablo = QTableWidget()
         self.tablo.setColumnCount(6)
@@ -354,11 +367,7 @@ class PeriyodikBakimPenceresi(QWidget):
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tablo.verticalHeader().setVisible(False)
-        self.tablo.setStyleSheet("""
-            QTableWidget { background-color: #1e1e1e; gridline-color: #333; border: 1px solid #333; border-radius: 8px; }
-            QHeaderView::section { background-color: #2b2b2b; color: #ccc; padding: 8px; border: none; font-weight: bold; }
-            QTableWidget::item { padding: 5px; }
-        """)
+        # Manuel stil kaldırıldı, tema.py yönetecek
         self.tablo.doubleClicked.connect(self.satir_tiklandi)
         sag_panel.addWidget(self.tablo)
         
@@ -381,12 +390,13 @@ class PeriyodikBakimPenceresi(QWidget):
             
         grp = ModernInputGroup(label, widget)
         
+        # 🟢 HATA DÜZELTME: Layout/Widget ekleme kontrolü
         if isinstance(parent, InfoCard):
             parent.add_widget(grp)
-        elif hasattr(parent, "addWidget"):
+        elif hasattr(parent, "addWidget"): # QVBoxLayout, QHBoxLayout vb.
             parent.addWidget(grp)
-        elif hasattr(parent, "addLayout"):
-            parent.addLayout(grp)
+        elif hasattr(parent, "addLayout"): # Yedek (QBoxLayout türevi)
+            parent.addWidget(grp) # Layout'a widget eklenir
             
         self.inputs[key] = widget
         return widget
@@ -742,8 +752,15 @@ class PeriyodikBakimPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    from temalar.tema import TemaYonetimi
-    TemaYonetimi.uygula_fusion_dark(app)
+    
+    # Tema uygulaması eklendi
+    try:
+        from temalar.tema import TemaYonetimi
+        TemaYonetimi.uygula_fusion_dark(app)
+    except Exception as e:
+        print(f"Tema uygulanamadı: {e}")
+        app.setStyle("Fusion")
+        
     win = PeriyodikBakimPenceresi()
     win.show()
     sys.exit(app.exec())

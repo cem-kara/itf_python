@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QLineEdit, QPushButton, QLabel, QMessageBox, 
                                QComboBox, QDateEdit, QFrame, QGraphicsDropShadowEffect, 
                                QTextEdit, QScrollArea, QAbstractItemView, QCompleter, 
-                               QProgressBar, QSplitter, QSizePolicy)
+                               QProgressBar, QSplitter, QSizePolicy, QGroupBox)
 from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QColor, QFont, QIcon
 
@@ -19,23 +19,28 @@ from PySide6.QtGui import QColor, QFont, QIcon
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("RKEYonetim")
 
-# --- BAĞLANTILAR ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
 # --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir
     from araclar.ortak_araclar import show_info, show_error, pencereyi_kapat
-except ImportError:
-    def veritabani_getir(vt_tipi, sayfa_adi): return None
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
+    # Fallback
+    def veritabani_getir(vt, sayfa): return None
     def show_info(t, m, p): print(m)
     def show_error(t, m, p): print(m)
     def pencereyi_kapat(w): w.close()
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # =============================================================================
 # 1. WORKER THREADS (ARKA PLAN İŞLEMLERİ)
@@ -57,12 +62,7 @@ class RKEVeriYukleyici(QThread):
                 "Bedeni": {}
             }
             
-            # Sadece bu kodlara sahip satırları alacağız
-            #hedef_kodlar = ["AnaBilimDali", "Birim", "Koruyucu_Cinsi", "Beden"]
-
             ws_sabit = veritabani_getir('sabit', 'Sabitler')
-            if ws_sabit:
-                ws_sabit = veritabani_getir('sabit', 'Sabitler')
             if ws_sabit:
                 kayitlar = ws_sabit.get_all_records()
                 for satir in kayitlar:
@@ -145,50 +145,44 @@ class ModernInputGroup(QWidget):
         self.widget = widget
         self.widget.setMinimumHeight(30)
         
-        base_style = """
-            border: 1px solid #3a3a3a; border-radius: 4px; padding: 5px; 
-            background-color: #2b2b2b; color: #e0e0e0;
-        """
+        # Manuel stiller kaldırıldı, tema.py yönetecek
         if isinstance(widget, QTextEdit):
             self.widget.setMinimumHeight(60)
-            self.widget.setStyleSheet(f"QTextEdit {{ {base_style} }}")
-        else:
-            self.widget.setStyleSheet(f"""
-                QLineEdit, QComboBox, QDateEdit {{ {base_style} }}
-                QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 1px solid #42a5f5; }}
-                QLineEdit:read-only {{ background-color: #202020; color: #777; border: none; }}
-            """)
         
         layout.addWidget(self.lbl)
         layout.addWidget(self.widget)
 
-class InfoCard(QFrame):
+class InfoCard(QGroupBox):
+    """
+    Görsel gruplama sağlayan kart bileşeni (QGroupBox).
+    """
     def __init__(self, title, parent=None, color="#42a5f5"):
-        super().__init__(parent)
-        self.setStyleSheet("InfoCard { background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px; }")
+        super().__init__(title, parent)
+        
+        self.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 20px; 
+                font-weight: bold;
+                color: {color}; 
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 10px;
+                left: 10px;
+            }}
+        """)
         
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(15); shadow.setColor(QColor(0, 0, 0, 80))
         self.setGraphicsEffect(shadow)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(15, 15, 15, 15)
+        self.layout.setContentsMargins(15, 20, 15, 15)
         self.layout.setSpacing(10)
-        
-        if title:
-            h_lay = QHBoxLayout()
-            indicator = QFrame()
-            indicator.setFixedSize(4, 16)
-            indicator.setStyleSheet(f"background-color: {color}; border-radius: 2px;")
-            lbl = QLabel(title)
-            lbl.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold;")
-            h_lay.addWidget(indicator); h_lay.addWidget(lbl); h_lay.addStretch()
-            self.layout.addLayout(h_lay)
-            
-            line = QFrame()
-            line.setFrameShape(QFrame.HLine)
-            line.setStyleSheet("background-color: #333; margin-bottom: 5px;")
-            self.layout.addWidget(line)
 
     def add_widget(self, w): self.layout.addWidget(w)
     def add_layout(self, l): self.layout.addLayout(l)
@@ -205,6 +199,7 @@ class RKEYonetimPenceresi(QWidget):
         
         self.setWindowTitle("RKE Envanter Yönetimi")
         self.resize(1350, 850)
+        # Manuel stil kaldırıldı
         
         # Değişkenler
         self.sabitler = {}
@@ -235,7 +230,10 @@ class RKEYonetimPenceresi(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background: transparent;")
+        
         form_inner = QWidget()
+        form_inner.setStyleSheet("background: transparent;")
         inner_layout = QVBoxLayout(form_inner)
         inner_layout.setSpacing(15)
         inner_layout.setContentsMargins(5, 5, 5, 20)
@@ -299,6 +297,7 @@ class RKEYonetimPenceresi(QWidget):
         self.tbl_gecmis.verticalHeader().setVisible(False)
         self.tbl_gecmis.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_gecmis.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # Manuel stil kaldırıldı, tema yönetecek
         card_gecmis.add_widget(self.tbl_gecmis)
         inner_layout.addWidget(card_gecmis)
 
@@ -314,13 +313,13 @@ class RKEYonetimPenceresi(QWidget):
         h_btn = QHBoxLayout()
         
         self.btn_yeni = QPushButton("TEMİZLE / YENİ")
-        self.btn_yeni.setObjectName("btn_yeni") # Yetki
+        self.btn_yeni.setObjectName("btn_yeni") 
         self.btn_yeni.setFixedHeight(45)
         self.btn_yeni.setStyleSheet("background: transparent; border: 1px solid #555; color: #ccc; border-radius: 6px;")
         self.btn_yeni.clicked.connect(self.temizle)
         
         self.btn_kaydet = QPushButton("KAYDET")
-        self.btn_kaydet.setObjectName("btn_kaydet") # Yetki
+        self.btn_kaydet.setObjectName("btn_kaydet") 
         self.btn_kaydet.setFixedHeight(45)
         self.btn_kaydet.setStyleSheet("background-color: #2e7d32; color: white; border: none; border-radius: 6px; font-weight: bold;")
         self.btn_kaydet.clicked.connect(self.kaydet)
@@ -334,11 +333,11 @@ class RKEYonetimPenceresi(QWidget):
         liste_layout = QVBoxLayout(liste_container)
         liste_layout.setContentsMargins(10, 0, 0, 0)
 
-        # Filtre
-        filter_frame = QFrame()
-        filter_frame.setStyleSheet("background: #1e1e1e; border-radius: 8px; border: 1px solid #333;")
-        h_filter = QHBoxLayout(filter_frame)
-        h_filter.setContentsMargins(10, 10, 10, 10)
+        # Filtre (GroupBox ile)
+        grp_filtre = QGroupBox("Filtreleme")
+        grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        h_filter = QHBoxLayout(grp_filtre)
+        h_filter.setContentsMargins(10, 20, 10, 10)
         
         self.cmb_filtre_abd = QComboBox()
         self.cmb_filtre_abd.addItem("Tüm ABD")
@@ -352,11 +351,12 @@ class RKEYonetimPenceresi(QWidget):
         btn_yenile = QPushButton("⟳")
         btn_yenile.setFixedSize(35,35)
         btn_yenile.clicked.connect(self.verileri_yukle)
+        # Stil temaya bırakıldı
         
         h_filter.addWidget(self.cmb_filtre_abd)
         h_filter.addWidget(self.txt_ara)
         h_filter.addWidget(btn_yenile)
-        liste_layout.addWidget(filter_frame)
+        liste_layout.addWidget(grp_filtre)
 
         # Tablo
         self.tablo = QTableWidget()
@@ -380,6 +380,7 @@ class RKEYonetimPenceresi(QWidget):
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tablo.setAlternatingRowColors(True)
+        # Manuel stil kaldırıldı
         self.tablo.cellDoubleClicked.connect(self.satir_secildi)
         liste_layout.addWidget(self.tablo)
         
@@ -403,13 +404,19 @@ class RKEYonetimPenceresi(QWidget):
             widget = QDateEdit(); widget.setCalendarPopup(True); widget.setDate(QDate.currentDate())
             widget.setDisplayFormat("yyyy-MM-dd")
         
-        if read_only and isinstance(widget, QLineEdit): widget.setReadOnly(True)
+        if read_only and isinstance(widget, QLineEdit): 
+            widget.setReadOnly(True)
+            # ReadOnly stil temizlendi, tema halleder
         
         grp = ModernInputGroup(label, widget)
-        # Layout/Widget farkı olmadan güvenli ekleme
-        if hasattr(parent, "add_widget"): parent.add_widget(grp)
-        elif hasattr(parent, "addWidget"): parent.addWidget(grp)
-        elif hasattr(parent, "addLayout"): parent.addWidget(grp)
+        
+        # 🟢 GÜVENLİ EKLEME: Hem InfoCard(QGroupBox) hem Layout desteği
+        if isinstance(parent, InfoCard):
+            parent.add_widget(grp)
+        elif hasattr(parent, "addWidget"): # QVBoxLayout vb.
+            parent.addWidget(grp)
+        elif hasattr(parent, "addLayout"):
+            parent.addWidget(grp)
             
         self.inputs[key] = widget
         return widget

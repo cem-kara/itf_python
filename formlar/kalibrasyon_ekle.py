@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QLineEdit, QPushButton, QLabel, QMessageBox, 
                                QComboBox, QDateEdit, QTextEdit, QFileDialog, 
                                QProgressBar, QFrame, QGraphicsDropShadowEffect, 
-                               QCompleter, QAbstractItemView, QGroupBox)
+                               QCompleter, QAbstractItemView, QGroupBox, QSizePolicy)
 from PySide6.QtCore import Qt, QDate, QUrl, QThread, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QBrush, QFont
 
@@ -21,24 +21,30 @@ logger = logging.getLogger("KalibrasyonTakip")
 # --- AYARLAR ---
 DRIVE_KLASOR_ID = "1KIYRhomNGppMZCXbqyngT2kH0X8c-GEK" 
 
-# --- BAĞLANTILAR ---
+# --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
-from araclar.yetki_yonetimi import YetkiYoneticisi
-
+# --- İMPORTLAR ---
 try:
+    from araclar.yetki_yonetimi import YetkiYoneticisi
+    from temalar.tema import TemaYonetimi
     from google_baglanti import veritabani_getir, GoogleDriveService
     from araclar.ortak_araclar import show_info, show_error, pencereyi_kapat
-except ImportError:
-    def veritabani_getir(vt_tipi, sayfa_adi): return None
+except ImportError as e:
+    print(f"Modül Hatası: {e}")
+    # Fallback
+    def veritabani_getir(vt, sayfa): return None
     def show_info(t, m, p): print(m)
     def show_error(t, m, p): print(m)
     def pencereyi_kapat(w): w.close()
     class GoogleDriveService:
         def upload_file(self, a, b): return None
+    class TemaYonetimi:
+        @staticmethod
+        def uygula_fusion_dark(app): pass
 
 # =============================================================================
 # 1. THREAD SINIFLARI (VERİ VE İŞLEM YÖNETİMİ)
@@ -106,12 +112,8 @@ class IslemKaydedici(QThread):
             
             elif self.mod == "guncelle":
                 # Güncelleme
-                # 1. ID'ye göre satırı bul (ID 1. sütunda varsayıyoruz - A sütunu)
                 cell = ws.find(self.kayit_id)
                 if cell:
-                    # Satır numarasını bulduk, o satırı komple güncelle
-                    # GSpread update range kullanacağız. A[row]:J[row] arası
-                    # Veri listemiz tam sıralı olmalı
                     range_str = f"A{cell.row}:J{cell.row}"
                     ws.update(range_str, [self.veri])
                 else:
@@ -156,41 +158,49 @@ class ModernInputGroup(QWidget):
         
         self.widget = widget
         self.widget.setMinimumHeight(40)
+        self.widget.setMinimumWidth(150)
         
-        base_style = """
-            background-color: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 6px; 
-            padding: 8px; color: #e0e0e0; font-size: 14px;
-        """
-        focus_style = "border: 1px solid #42a5f5;"
-        
+        # Manuel stiller kaldırıldı, TemaYonetimi yönetecek
         if isinstance(widget, QTextEdit):
             self.widget.setMinimumHeight(80)
-            self.widget.setStyleSheet(f"QTextEdit {{ {base_style} }} QTextEdit:focus {{ {focus_style} }}")
-        else:
-            self.widget.setStyleSheet(f"""
-                QLineEdit, QComboBox, QDateEdit {{ {base_style} min-height: 18px; }}
-                QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ {focus_style} background-color: #333333; }}
-            """)
         
         layout.addWidget(self.lbl)
         layout.addWidget(self.widget)
 
-class InfoCard(QFrame):
+class InfoCard(QGroupBox):
+    """
+    Görsel gruplama sağlayan kart bileşeni (QGroupBox).
+    """
     def __init__(self, title, parent=None, color="#42a5f5"):
-        super().__init__(parent)
-        self.setStyleSheet("InfoCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333; }")
+        super().__init__(title, parent)
+        
+        self.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 20px; 
+                font-weight: bold;
+                color: {color}; 
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 10px;
+                left: 10px;
+            }}
+        """)
+        
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20); shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(2)
+        shadow.setColor(QColor(0, 0, 0, 100))
         self.setGraphicsEffect(shadow)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setContentsMargins(15, 20, 15, 15)
         self.layout.setSpacing(15)
-        
-        if title:
-            lbl_title = QLabel(title)
-            lbl_title.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px;")
-            self.layout.addWidget(lbl_title)
 
     def add_widget(self, widget): self.layout.addWidget(widget)
     def add_layout(self, layout): self.layout.addLayout(layout)
@@ -206,7 +216,7 @@ class KalibrasyonEklePenceresi(QWidget):
         self.kullanici_adi = kullanici_adi
         self.setWindowTitle("Kalibrasyon Yönetimi")
         self.resize(1300, 800)
-        self.setStyleSheet("background-color: #121212; color: #e0e0e0;")
+        # Manuel arka plan kaldırıldı
         
         self.inputs = {}
         self.cihaz_sozlugu = {}
@@ -218,6 +228,7 @@ class KalibrasyonEklePenceresi(QWidget):
         self.duzenlenen_id = None
         
         self.setup_ui()
+        # Yetki
         YetkiYoneticisi.uygula(self, "kalibrasyon_ekle")
         self.verileri_yukle()
 
@@ -276,14 +287,14 @@ class KalibrasyonEklePenceresi(QWidget):
         
         # Butonlar
         self.btn_temizle = QPushButton("Yeni Kayıt / Temizle")
-        self.btn_temizle.setObjectName("btn_temizle")
+        self.btn_temizle.setObjectName("btn_temizle") # Yetki
         self.btn_temizle.setCursor(Qt.PointingHandCursor)
         self.btn_temizle.setStyleSheet("background: transparent; border: 1px dashed #666; color: #aaa; padding: 10px; border-radius: 6px;")
         self.btn_temizle.clicked.connect(self.formu_temizle)
         sol_panel.addWidget(self.btn_temizle)
         
         self.btn_kaydet = QPushButton("💾 KAYDET")
-        self.btn_kaydet.setObjectName("btn_kaydet")
+        self.btn_kaydet.setObjectName("btn_kaydet") # Yetki
         self.btn_kaydet.setCursor(Qt.PointingHandCursor)
         self.btn_kaydet.setMinimumHeight(50)
         self.btn_kaydet.setStyleSheet("""
@@ -302,13 +313,17 @@ class KalibrasyonEklePenceresi(QWidget):
         
         # --- SAĞ PANEL (LİSTE) ---
         sag_panel = QVBoxLayout()
-        filter_bar = QHBoxLayout()
-        lbl_list_baslik = QLabel("Kalibrasyon Geçmişi")
-        lbl_list_baslik.setStyleSheet("font-size: 20px; font-weight: bold; color: #42a5f5;")
+        
+        # HEADER (GroupBox ile)
+        grp_filtre = QGroupBox("Kalibrasyon Geçmişi")
+        grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        grp_filtre.setStyleSheet("QGroupBox { font-size: 14px; font-weight: bold; color: #42a5f5; margin-top: 10px; }")
+        
+        filter_layout = QHBoxLayout(grp_filtre)
         
         self.txt_ara = QLineEdit()
         self.txt_ara.setPlaceholderText("Listede Ara...")
-        self.txt_ara.setStyleSheet("background: #1e1e1e; border: 1px solid #333; padding: 5px; color: white; border-radius: 15px; padding-left: 10px;")
+        # Stil temaya bırakıldı
         self.txt_ara.setFixedWidth(250)
         self.txt_ara.textChanged.connect(self.tabloyu_filtrele)
         
@@ -316,13 +331,12 @@ class KalibrasyonEklePenceresi(QWidget):
         btn_yenile.setObjectName("btn_yenile")
         btn_yenile.setFixedSize(35, 35)
         btn_yenile.clicked.connect(self.verileri_yukle)
-        btn_yenile.setStyleSheet("background: #333; color: white; border: 1px solid #444; border-radius: 4px;")
+        # Stil temaya bırakıldı
         
-        filter_bar.addWidget(lbl_list_baslik)
-        filter_bar.addStretch()
-        filter_bar.addWidget(self.txt_ara)
-        filter_bar.addWidget(btn_yenile)
-        sag_panel.addLayout(filter_bar)
+        filter_layout.addStretch()
+        filter_layout.addWidget(self.txt_ara)
+        filter_layout.addWidget(btn_yenile)
+        sag_panel.addWidget(grp_filtre)
         
         self.tablo = QTableWidget()
         self.tablo.setColumnCount(6)
@@ -332,13 +346,7 @@ class KalibrasyonEklePenceresi(QWidget):
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tablo.verticalHeader().setVisible(False)
-        self.tablo.setStyleSheet("""
-            QTableWidget { background-color: #1e1e1e; gridline-color: #333; border: 1px solid #333; border-radius: 8px; }
-            QHeaderView::section { background-color: #2b2b2b; color: #ccc; padding: 8px; border: none; font-weight: bold; }
-            QTableWidget::item { padding: 5px; }
-            QTableWidget::item:selected { background-color: #42a5f5; color: white; }
-        """)
-        # 🟢 YENİ: Tıklama sinyali
+        # Stil temaya bırakıldı
         self.tablo.cellClicked.connect(self.satir_secildi)
         
         sag_panel.addWidget(self.tablo)
@@ -359,10 +367,17 @@ class KalibrasyonEklePenceresi(QWidget):
         elif tip == "date": 
             widget = QDateEdit(); widget.setCalendarPopup(True); widget.setDisplayFormat("yyyy-MM-dd")
             widget.setDate(QDate.currentDate())
+            
         grp = ModernInputGroup(label, widget)
-        if isinstance(parent, InfoCard): parent.add_widget(grp)
-        elif hasattr(parent, "addWidget"): parent.addWidget(grp)
-        elif hasattr(parent, "addLayout"): parent.addLayout(grp)
+        
+        # 🟢 HATA DÜZELTME: Layout/Widget ekleme kontrolü
+        if isinstance(parent, InfoCard):
+            parent.add_widget(grp)
+        elif hasattr(parent, "addWidget"):
+            parent.addWidget(grp)
+        elif hasattr(parent, "addLayout"):
+            parent.addWidget(grp)
+            
         self.inputs[key] = widget
         return widget
 
@@ -370,15 +385,19 @@ class KalibrasyonEklePenceresi(QWidget):
         container = QWidget()
         lay = QHBoxLayout(container)
         lay.setContentsMargins(0,0,0,0)
+        
         self.lbl_dosya = QLabel("Dosya Seçilmedi")
         self.lbl_dosya.setStyleSheet("color: #666; font-style: italic;")
+        
         btn_yukle = QPushButton("📂 Seç")
         btn_yukle.setFixedSize(60, 35)
-        btn_yukle.setStyleSheet("background: #333; border: 1px solid #444; border-radius: 4px; color: white;")
+        # Stil temaya bırakıldı
         btn_yukle.clicked.connect(self.dosya_sec)
+        
         lay.addWidget(self.lbl_dosya)
         lay.addStretch()
         lay.addWidget(btn_yukle)
+        
         grp = ModernInputGroup(label, container)
         container.setStyleSheet("background: transparent;")
         card.add_widget(grp)
@@ -467,27 +486,22 @@ class KalibrasyonEklePenceresi(QWidget):
                 item_link.setToolTip(dosya)
             self.tablo.setItem(r, 5, item_link)
             
-            # Tüm veriyi sakla
             self.tablo.item(r, 0).setData(Qt.UserRole, row)
 
-    # 🟢 YENİ: Listeden seçileni forma doldur
     def satir_secildi(self, row, col):
         item = self.tablo.item(row, 0)
         if not item: return
         
-        veri = item.data(Qt.UserRole) # [ID, CihazID, Firma, Sertifika, Yapilan, Gecerlilik, Bitis, Durum, Dosya, Aciklama]
+        veri = item.data(Qt.UserRole)
         if not veri: return
 
         self.duzenleme_modu = True
         self.duzenlenen_id = str(veri[0])
         self.mevcut_link = str(veri[8]) if len(veri) > 8 else "-"
         
-        # Butonu GÜNCELLE yap
         self.btn_kaydet.setText("GÜNCELLE")
         self.btn_kaydet.setStyleSheet("background-color: #FFA000; color: white; border-radius: 8px; font-weight: bold;")
 
-        # Alanları Doldur
-        # Cihaz ID'sini ComboBox'ta bulmaya çalış
         c_id = str(veri[1])
         index = self.inputs["Cihaz"].findText(c_id, Qt.MatchContains)
         if index >= 0: self.inputs["Cihaz"].setCurrentIndex(index)
@@ -546,13 +560,11 @@ class KalibrasyonEklePenceresi(QWidget):
             self.uploader.yuklendi.connect(lambda l: self.kaydet_devam(l, cihaz_id))
             self.uploader.start()
         else:
-            # Dosya seçilmediyse, güncelleme modundaysak eski linki koru, değilse "-"
             link = self.mevcut_link if self.duzenleme_modu else "-"
             self.kaydet_devam(link, cihaz_id)
 
     def kaydet_devam(self, link, cihaz_id):
         try:
-            # ID: Yeni ise oluştur, Güncelleme ise varolanı kullan
             unique_id = self.duzenlenen_id if self.duzenleme_modu else f"K-{int(datetime.datetime.now().timestamp())}"
             
             firma = self.inputs["Firma"].currentText()
