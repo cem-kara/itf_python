@@ -95,7 +95,7 @@ class TemaYonetimi:
         /* ==================== GENEL AYARLAR ==================== */
         QWidget {{
             font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, system-ui, sans-serif;
-            font-size: 9pt;
+            font-size: 10pt;
             selection-background-color: {r['secim_bg']};
             selection-color: #ffffff;
         }}
@@ -130,7 +130,7 @@ class TemaYonetimi:
             border-radius: 4px;
             padding: 6px 8px;
             color: {r['metin']};
-            min-height: 24px;
+            min-height: 18px;
         }}
         
         QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover,
@@ -191,7 +191,7 @@ class TemaYonetimi:
             border-radius: 4px;
             padding: 6px 8px;
             color: {r['metin']};
-            min-height: 24px;
+            min-height: 18px;
             padding-right: 28px;
         }}
         
@@ -239,7 +239,7 @@ class TemaYonetimi:
         }}
         
         QComboBox QAbstractItemView::item {{
-            min-height: 28px;
+            min-height: 18px;
             padding: 4px 8px;
             border-radius: 4px;
         }}
@@ -256,7 +256,7 @@ class TemaYonetimi:
             padding: 7px 16px;
             color: {r['metin']};
             font-weight: 500;
-            min-height: 28px;
+            min-height: 18px;
         }}
         
         QPushButton:hover {{

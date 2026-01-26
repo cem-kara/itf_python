@@ -10,13 +10,13 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QScrollArea, QFileDialog, QTabWidget, QProgressBar, QFrame,
-    QComboBox, QCompleter, QLineEdit, QDateEdit, QFormLayout, QApplication
+    QComboBox, QCompleter, QLineEdit, QDateEdit, QFormLayout, QApplication, QGroupBox
 )
+from PySide6.QtGui import QIntValidator
 
 # --- YOL AYARLARI ---
-# Dosyanın 'formlar' klasöründe olduğu varsayılarak proje kök dizini eklenir
 current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(current_dir) # Bir üst dizin (Proje Kökü)
+root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
@@ -27,7 +27,6 @@ try:
         OrtakAraclar, pencereyi_kapat, show_info, show_error, 
         validate_required_fields, kayitlari_getir, satir_ekle
     )
-    # Tema klasör yapısına uygun import
     from temalar.tema import TemaYonetimi 
     
     from google_baglanti import (
@@ -36,7 +35,6 @@ try:
     )
 except ImportError as e:
     print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
-    # Fallback tanımlar
     GoogleDriveService = None
     InternetBaglantiHatasi = Exception
     KimlikDogrulamaHatasi = Exception
@@ -53,7 +51,6 @@ class BaslangicYukleyici(QThread):
     def run(self):
         sonuc_dict = {'Drive_Klasor': {}}
         try:
-            # Sabitler
             tum_sabitler = kayitlari_getir(veritabani_getir, 'sabit', 'Sabitler')
             if tum_sabitler:
                 for satir in tum_sabitler:
@@ -67,7 +64,6 @@ class BaslangicYukleyici(QThread):
                             if kod not in sonuc_dict: sonuc_dict[kod] = []
                             sonuc_dict[kod].append(eleman)
             
-            # Personel Auto-Complete
             tum_personel = kayitlari_getir(veritabani_getir, 'personel', 'Personel')
             sehirler, okullar, bolumler = set(), set(), set()
             if tum_personel:
@@ -78,7 +74,6 @@ class BaslangicYukleyici(QThread):
                     fak1 = p.get('Mezun_Olunan_Fakülte')
                     if fak1: bolumler.add(fak1.strip())
 
-            # Sıralama
             for k in sonuc_dict:
                 if isinstance(sonuc_dict[k], list): sonuc_dict[k].sort()
             
@@ -159,18 +154,14 @@ class PersonelEklePenceresi(QWidget):
         self.kullanici_adi = kullanici_adi 
         
         self.setWindowTitle("Yeni Personel Ekle")
-        self.resize(1200, 850)
+        self.resize(1300, 850)
         
         self.dosya_yollari = {"Resim": None, "Diploma1": None, "Diploma2": None}
         self.drive_config = {} 
         self.ui = {} 
 
         self._setup_ui()
-        
-        # Yetki Kontrolü
         YetkiYoneticisi.uygula(self, "personel_ekle")
-        
-        # Verileri Yükle
         self._baslangic_yukle()
 
     def _setup_ui(self):
@@ -179,148 +170,176 @@ class PersonelEklePenceresi(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        content_widget = QWidget()
+        scroll.setStyleSheet("background: transparent;")
         
+        content_widget = QWidget()
         columns_layout = QHBoxLayout(content_widget)
         columns_layout.setSpacing(20)
+        columns_layout.setContentsMargins(10, 10, 10, 10)
 
-        # SOL SÜTUN
+        # ================= SOL SÜTUN =================
         left_layout = QVBoxLayout()
         left_layout.setAlignment(Qt.AlignTop)
+        left_layout.setSpacing(20)
 
-        # 1. Fotoğraf
-        grp_resim = OrtakAraclar.create_group_box(content_widget, "Personel Fotoğrafı")
-        v_resim = QVBoxLayout(grp_resim)
-        v_resim.setAlignment(Qt.AlignCenter)
+        # 1. KİMLİK VE FOTOĞRAF (BİRLEŞİK GRUP)
+        grp_kimlik = OrtakAraclar.create_group_box(content_widget, "Kimlik ve Fotoğraf Bilgileri")
+        v_kimlik = QVBoxLayout(grp_kimlik)
+        v_kimlik.setSpacing(15)
         
+        # A) Fotoğraf Alanı (Ortalı)
+        h_resim = QVBoxLayout() 
+        h_resim.setAlignment(Qt.AlignCenter)
         self.lbl_resim_onizleme = QLabel("Fotoğraf Yok")
-        self.lbl_resim_onizleme.setFixedSize(150, 170)
+        self.lbl_resim_onizleme.setFixedSize(140, 160)
         self.lbl_resim_onizleme.setStyleSheet("border: 2px dashed #555; background: #2b2b2b; color: #aaa; border-radius: 8px;")
         self.lbl_resim_onizleme.setAlignment(Qt.AlignCenter)
         self.lbl_resim_onizleme.setScaledContents(True)
+        btn_resim_sec = OrtakAraclar.create_button(grp_kimlik, "📷 Fotoğraf Seç", self._resim_sec)
+        btn_resim_sec.setFixedWidth(140)
+        h_resim.addWidget(self.lbl_resim_onizleme)
+        h_resim.addWidget(btn_resim_sec)
+        v_kimlik.addLayout(h_resim)
         
-        btn_resim_sec = OrtakAraclar.create_button(grp_resim, "📷 Fotoğraf Seç", self._resim_sec)
-        
-        v_resim.addWidget(self.lbl_resim_onizleme)
-        v_resim.addSpacing(10)
-        v_resim.addWidget(btn_resim_sec)
-        left_layout.addWidget(grp_resim)
+        v_kimlik.addSpacing(10)
 
-        # 2. Kimlik
-        grp_kimlik = OrtakAraclar.create_group_box(content_widget, "Kimlik Bilgileri")
-        form_kimlik = QFormLayout(grp_kimlik)
-        
-        self.ui['tc'] = OrtakAraclar.create_line_edit(grp_kimlik, placeholder="11 Haneli TC")
+        # B) Kimlik Inputları
+        self.ui['tc'] = self._create_input_with_label(grp_kimlik, "TC Kimlik No:", "11 Haneli TC")
         self.ui['tc'].setMaxLength(11)
-        from PySide6.QtGui import QIntValidator
         self.ui['tc'].setValidator(QIntValidator())
-        
-        self.ui['ad_soyad'] = OrtakAraclar.create_line_edit(grp_kimlik)
+        v_kimlik.addWidget(self.ui['tc'].parentWidget()) 
+
+        self.ui['ad_soyad'] = self._create_input_with_label(grp_kimlik, "Adı Soyadı:")
+        v_kimlik.addWidget(self.ui['ad_soyad'].parentWidget())
+
+        # C) Doğum Yeri ve Tarihi (Yan Yana)
+        row_dogum = QHBoxLayout()
         self.ui['dogum_yeri'] = self._create_editable_combo(grp_kimlik)
-        
         self.ui['dogum_tarihi'] = QDateEdit()
         self.ui['dogum_tarihi'].setCalendarPopup(True)
         self.ui['dogum_tarihi'].setDisplayFormat("dd.MM.yyyy")
+        self.ui['dogum_tarihi'].setMinimumHeight(20) 
         
-        form_kimlik.addRow("TC Kimlik No:", self.ui['tc'])
-        form_kimlik.addRow("Adı Soyadı:", self.ui['ad_soyad'])
-        form_kimlik.addRow("Doğum Yeri:", self.ui['dogum_yeri'])
-        form_kimlik.addRow("Doğum Tarihi:", self.ui['dogum_tarihi'])
+        row_dogum.addWidget(self._wrap_label_widget("Doğum Yeri:", self.ui['dogum_yeri']))
+        row_dogum.addWidget(self._wrap_label_widget("Doğum Tarihi:", self.ui['dogum_tarihi']))
+        v_kimlik.addLayout(row_dogum)
+
         left_layout.addWidget(grp_kimlik)
-
-        # 3. İletişim
-        grp_iletisim = OrtakAraclar.create_group_box(content_widget, "İletişim Bilgileri")
-        form_iletisim = QFormLayout(grp_iletisim)
         
-        self.ui['cep_tel'] = OrtakAraclar.create_line_edit(grp_iletisim, "05XX...")
-        self.ui['cep_tel'].setMaxLength(11)
-        self.ui['cep_tel'].setValidator(QIntValidator())
-        self.ui['eposta'] = OrtakAraclar.create_line_edit(grp_iletisim)
-        
-        form_iletisim.addRow("Cep Telefonu:", self.ui['cep_tel'])
-        form_iletisim.addRow("E-Posta Adresi:", self.ui['eposta'])
-        left_layout.addWidget(grp_iletisim)
-        columns_layout.addLayout(left_layout, 1)
+        # Sol sütun genişlik oranı
+        columns_layout.addLayout(left_layout, 4) 
 
-        # SAĞ SÜTUN
+        # ================= SAĞ SÜTUN =================
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
+        right_layout.setSpacing(20)
 
-        # 4. Kadro
-        grp_kadro = OrtakAraclar.create_group_box(content_widget, "Kadro ve Kurumsal Bilgiler")
-        grp_kadro.setFixedHeight(310)
-        form_kadro = QFormLayout(grp_kadro)
+        # 2. İLETİŞİM BİLGİLERİ (SAĞA VE YAN YANA ALINDI)
+        grp_iletisim = OrtakAraclar.create_group_box(content_widget, "İletişim Bilgileri")
+        h_iletisim = QHBoxLayout(grp_iletisim)
+        h_iletisim.setSpacing(15)
         
-        self.ui['hizmet_sinifi'] = OrtakAraclar.create_combo_box(grp_kadro)
-        self.ui['kadro_unvani'] = OrtakAraclar.create_combo_box(grp_kadro)
-        self.ui['gorev_yeri'] = OrtakAraclar.create_combo_box(grp_kadro)
+        self.ui['cep_tel'] = self._create_input_with_label(grp_iletisim, "Cep Telefonu:", "05XX...")
+        self.ui['cep_tel'].setMaxLength(11)
+        self.ui['cep_tel'].setValidator(QIntValidator())
+        h_iletisim.addWidget(self.ui['cep_tel'].parentWidget())
+        
+        self.ui['eposta'] = self._create_input_with_label(grp_iletisim, "E-Posta Adresi:")
+        h_iletisim.addWidget(self.ui['eposta'].parentWidget())
+        
+        right_layout.addWidget(grp_iletisim)
+
+        # 3. KADRO VE KURUMSAL
+        grp_kadro = OrtakAraclar.create_group_box(content_widget, "Kadro ve Kurumsal Bilgiler")
+        v_kadro = QVBoxLayout(grp_kadro)
+        v_kadro.setSpacing(15)
+        
+        # Satır 1: Hizmet Sınıfı | Kadro Ünvanı
+        row_k1 = QHBoxLayout()
+        self.ui['hizmet_sinifi'] = self._create_combo_no_label(grp_kadro)
+        self.ui['kadro_unvani'] = self._create_combo_no_label(grp_kadro)
+        row_k1.addWidget(self._wrap_label_widget("Hizmet Sınıfı:", self.ui['hizmet_sinifi']))
+        row_k1.addWidget(self._wrap_label_widget("Kadro Ünvanı:", self.ui['kadro_unvani']))
+        v_kadro.addLayout(row_k1)
+        
+        # Satır 2: Sicil No | Başlama Tarihi | Görev Yeri (ÜÇLÜ YAN YANA - YENİ DÜZEN)
+        row_k2 = QHBoxLayout()
+        
         self.ui['sicil_no'] = OrtakAraclar.create_line_edit(grp_kadro)
         
         self.ui['baslama_tarihi'] = QDateEdit()
         self.ui['baslama_tarihi'].setCalendarPopup(True)
         self.ui['baslama_tarihi'].setDisplayFormat("dd.MM.yyyy")
         self.ui['baslama_tarihi'].setDate(QDate.currentDate())
+        self.ui['baslama_tarihi'].setMinimumHeight(40)
         
-        form_kadro.addRow("Hizmet Sınıfı:", self.ui['hizmet_sinifi'])
-        form_kadro.addRow("Kadro Ünvanı:", self.ui['kadro_unvani'])
-        form_kadro.addRow("Görev Yeri:", self.ui['gorev_yeri'])
-        form_kadro.addRow("Kurum Sicil No:", self.ui['sicil_no'])
-        form_kadro.addRow("Başlama Tarihi:", self.ui['baslama_tarihi'])
+        self.ui['gorev_yeri'] = self._create_combo_no_label(grp_kadro)
+        
+        # Stretch (Esneme) Değerleri: Sicil(1), Tarih(0 - Sabit), Görev Yeri(1)
+        row_k2.addWidget(self._wrap_label_widget("Kurum Sicil No:", self.ui['sicil_no']), 1)
+        row_k2.addWidget(self._wrap_label_widget("Başlama Tarihi:", self.ui['baslama_tarihi']), 0)
+        row_k2.addWidget(self._wrap_label_widget("Görev Yeri:", self.ui['gorev_yeri']), 1)
+        
+        v_kadro.addLayout(row_k2)
+        
         right_layout.addWidget(grp_kadro)
 
-        # 5. Eğitim (GROUPBOX YÜKSEKLİĞİ SABİTLENDİ)
-        grp_egitim = OrtakAraclar.create_group_box(content_widget, "Eğitim Bilgileri")
+       # 4. EĞİTİM BİLGİLERİ (YAN YANA GRUPLAR)
+        grp_egitim_ana = OrtakAraclar.create_group_box(content_widget, "Eğitim Bilgileri")
+        layout_egitim_ana = QHBoxLayout(grp_egitim_ana)
         
-        # TabWidget yerine GroupBox'ın kendisine yükseklik verdik
-        # İçerik + başlık + boşluklar için ~310px yeterli
-        grp_egitim.setFixedHeight(310) 
+        # 🟢 GÜNCELLEME: Üstten 35px boşluk bırakılarak başlıkların okunması sağlandı
+        layout_egitim_ana.setContentsMargins(10, 20, 10, 10) 
         
-        v_egitim = QVBoxLayout(grp_egitim)
+        layout_egitim_ana.setSpacing(20)
         
-        self.tab_widget = QTabWidget()
-        # İçerik otomatik dolacak
+        # --- 1. Üniversite Grubu ---
+        grp_uni1 = QGroupBox("Üniversite / Yüksekokul")
+        grp_uni1.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: 1px; left: 10px; }")
+        l_uni1 = QVBoxLayout(grp_uni1)
         
-        # Tab 1
-        page1 = QWidget()
-        f1 = QFormLayout(page1)
-        self.ui['okul1'] = self._create_editable_combo(page1)
-        self.ui['fakulte1'] = self._create_editable_combo(page1)
-        self.ui['mezun_tarihi1'] = QDateEdit(); self.ui['mezun_tarihi1'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['diploma_no1'] = OrtakAraclar.create_line_edit(page1)
+        self.ui['okul1'] = self._create_editable_combo(grp_uni1)
+        self.ui['fakulte1'] = self._create_editable_combo(grp_uni1)
+        l_uni1.addWidget(self._wrap_label_widget("Okul:", self.ui['okul1']))
+        l_uni1.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte1']))
         
-        h_d1 = QHBoxLayout()
-        self.btn_dip1 = OrtakAraclar.create_button(page1, "📄 Diploma 1 Yükle", lambda: self._dosya_sec("Diploma1", self.btn_dip1))
-        h_d1.addWidget(self.btn_dip1)
+        row_u1_2 = QHBoxLayout()
+        self.ui['mezun_tarihi1'] = QDateEdit(); self.ui['mezun_tarihi1'].setDisplayFormat("dd.MM.yyyy"); self.ui['mezun_tarihi1'].setMinimumHeight(40)
+        self.ui['diploma_no1'] = OrtakAraclar.create_line_edit(grp_uni1)
+        row_u1_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi1']))
+        row_u1_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no1']))
+        l_uni1.addLayout(row_u1_2)
         
-        f1.addRow("Okul:", self.ui['okul1'])
-        f1.addRow("Bölüm/Fakülte:", self.ui['fakulte1'])
-        f1.addRow("Mezuniyet Tarihi:", self.ui['mezun_tarihi1'])
-        f1.addRow("Diploma No:", self.ui['diploma_no1'])
-        f1.addRow("Dosya:", h_d1)
-        self.tab_widget.addTab(page1, "1. Üniversite")
+        self.btn_dip1 = OrtakAraclar.create_button(grp_uni1, "📄 Diploma Dosyası Seç", lambda: self._dosya_sec("Diploma1", self.btn_dip1))
+        l_uni1.addWidget(self.btn_dip1)
+        layout_egitim_ana.addWidget(grp_uni1)
 
-        # Tab 2
-        page2 = QWidget()
-        f2 = QFormLayout(page2)
-        self.ui['okul2'] = self._create_editable_combo(page2)
-        self.ui['fakulte2'] = self._create_editable_combo(page2)
-        self.ui['mezun_tarihi2'] = QDateEdit(); self.ui['mezun_tarihi2'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['diploma_no2'] = OrtakAraclar.create_line_edit(page2)
+        # --- 2. Üniversite Grubu ---
+        grp_uni2 = QGroupBox("Yüksek Lisans / Lisans / Lisans Tamamlama")
+        grp_uni2.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: 1px; left: 10px; }")
+        l_uni2 = QVBoxLayout(grp_uni2)
         
-        h_d2 = QHBoxLayout()
-        self.btn_dip2 = OrtakAraclar.create_button(page2, "📄 Diploma 2 Yükle", lambda: self._dosya_sec("Diploma2", self.btn_dip2))
-        h_d2.addWidget(self.btn_dip2)
+        self.ui['okul2'] = self._create_editable_combo(grp_uni2)
+        self.ui['fakulte2'] = self._create_editable_combo(grp_uni2)
+        l_uni2.addWidget(self._wrap_label_widget("Okul:", self.ui['okul2']))
+        l_uni2.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte2']))
         
-        f2.addRow("Okul:", self.ui['okul2'])
-        f2.addRow("Bölüm/Fakülte:", self.ui['fakulte2'])
-        f2.addRow("Mezuniyet Tarihi:", self.ui['mezun_tarihi2'])
-        f2.addRow("Diploma No:", self.ui['diploma_no2'])
-        f2.addRow("Dosya:", h_d2)
-        self.tab_widget.addTab(page2, "2. Üniversite")
+        row_u2_2 = QHBoxLayout()
+        self.ui['mezun_tarihi2'] = QDateEdit(); self.ui['mezun_tarihi2'].setDisplayFormat("dd.MM.yyyy"); self.ui['mezun_tarihi2'].setMinimumHeight(40)
+        self.ui['diploma_no2'] = OrtakAraclar.create_line_edit(grp_uni2)
+        row_u2_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi2']))
+        row_u2_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no2']))
+        l_uni2.addLayout(row_u2_2)
         
-        v_egitim.addWidget(self.tab_widget)
-        right_layout.addWidget(grp_egitim)
-        columns_layout.addLayout(right_layout, 2)
+        self.btn_dip2 = OrtakAraclar.create_button(grp_uni2, "📄 Diploma Dosyası Seç", lambda: self._dosya_sec("Diploma2", self.btn_dip2))
+        l_uni2.addWidget(self.btn_dip2)
+        layout_egitim_ana.addWidget(grp_uni2)
+
+        right_layout.addWidget(grp_egitim_ana)
+        right_layout.addStretch()
+        
+        columns_layout.addLayout(right_layout, 6) 
+
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
 
@@ -331,12 +350,13 @@ class PersonelEklePenceresi(QWidget):
         self.progress.setVisible(False)
         
         btn_iptal = QPushButton("İptal")
-        # İptal butonu için özel ID (tema.py içindeki CSS için)
         btn_iptal.setObjectName("btn_iptal") 
+        btn_iptal.setFixedSize(120, 45)
         btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
         
         self.btn_kaydet = OrtakAraclar.create_button(self, "✅ Personel Kaydet", self._kaydet_baslat)
         self.btn_kaydet.setObjectName("btn_kaydet") 
+        self.btn_kaydet.setFixedSize(180, 45)
         
         footer.addWidget(self.progress)
         footer.addStretch()
@@ -344,11 +364,46 @@ class PersonelEklePenceresi(QWidget):
         footer.addWidget(self.btn_kaydet)
         main_layout.addLayout(footer)
         
+    # --- YARDIMCI UI METODLARI ---
+    def _create_input_with_label(self, parent, label_text, placeholder=""):
+        """Label ve LineEdit'i bir container içinde döner."""
+        container = QWidget(parent) 
+        lay = QVBoxLayout(container)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(5)
+        
+        lbl = QLabel(label_text)
+        lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
+        
+        inp = OrtakAraclar.create_line_edit(container, placeholder)
+        
+        lay.addWidget(lbl)
+        lay.addWidget(inp)
+        return inp 
+
+    def _wrap_label_widget(self, label_text, widget):
+        """Herhangi bir widget'ı label ile dikey sarar"""
+        container = QWidget() 
+        lay = QVBoxLayout(container)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(5)
+        
+        lbl = QLabel(label_text)
+        lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
+        
+        lay.addWidget(lbl)
+        lay.addWidget(widget)
+        return container
+
     def _create_editable_combo(self, parent):
         combo = OrtakAraclar.create_combo_box(parent)
         combo.setEditable(True)
         combo.setInsertPolicy(QComboBox.NoInsert)
         combo.completer().setCompletionMode(QCompleter.PopupCompletion)
+        return combo
+        
+    def _create_combo_no_label(self, parent):
+        combo = QComboBox(parent)
         return combo
 
     def _baslangic_yukle(self):
@@ -370,7 +425,7 @@ class PersonelEklePenceresi(QWidget):
         d, _ = QFileDialog.getOpenFileName(self, "Fotoğraf Seç", "", "Resim (*.jpg *.png *.jpeg)")
         if d: 
             self.dosya_yollari["Resim"] = d
-            self.lbl_resim_onizleme.setPixmap(QPixmap(d).scaled(150, 170, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.lbl_resim_onizleme.setPixmap(QPixmap(d).scaled(140, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def _dosya_sec(self, key, btn):
         d, _ = QFileDialog.getOpenFileName(self, "Dosya Seç", "", "Dosya (*.pdf *.jpg *.png)")

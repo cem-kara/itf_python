@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QCheckBox, QListWidget, QAbstractItemView, QStyledItemDelegate)
 from PySide6.QtCore import Qt, QDate, QThread, Signal, QSize, QUrl, QEvent, QTimer
 from PySide6.QtGui import QColor, QBrush, QIcon, QDesktopServices, QFont, QStandardItemModel, QStandardItem, QPalette
+from dateutil.relativedelta import relativedelta # Tarih hesaplama için gerekli
 
 # --- LOGLAMA ---
 logging.basicConfig(level=logging.INFO)
@@ -52,18 +53,9 @@ except ImportError as e:
 # 0. YARDIMCI FONKSİYONLAR
 # =============================================================================
 def envanter_durumunu_belirle(fiziksel, skopi):
-    """
-    Muayene sonuçlarına göre rke_list tablosundaki Durum'u belirler.
-    Kural: Fiziksel 'Sağlam' VE Skopi 'Uygun' (veya Yapılmadı) ise -> Kullanıma Uygun
-    Aksi halde -> Kullanıma Uygun Değil
-    """
-    fiz_ok = (fiziksel == "Kulanıma Uygun")
+    fiz_ok = (fiziksel == "Kullanıma Uygun")
     sko_ok = (skopi == "Kullanıma Uygun" or skopi == "Yapılmadı")
-    
-    if fiz_ok and sko_ok:
-        return "Kullanıma Uygun"
-    else:
-        return "Kullanıma Uygun Değil"
+    return "Kullanıma Uygun" if fiz_ok and sko_ok else "Kullanıma Uygun Değil"
 
 # =============================================================================
 # 1. ÖZEL BİLEŞENLER (CHECKABLE COMBOBOX)
@@ -75,8 +67,6 @@ class CheckableComboBox(QComboBox):
         self.setModel(QStandardItemModel(self))
         self.setEditable(True)
         self.lineEdit().setReadOnly(True) 
-        
-        # Tema uyumu
         palette = self.lineEdit().palette()
         palette.setColor(QPalette.Base, QColor("#2d2d2d"))
         palette.setColor(QPalette.Text, QColor("#ffffff"))
@@ -84,44 +74,30 @@ class CheckableComboBox(QComboBox):
 
     def handleItemPressed(self, index):
         item = self.model().itemFromIndex(index)
-        if item.checkState() == Qt.Checked:
-            item.setCheckState(Qt.Unchecked)
-        else:
-            item.setCheckState(Qt.Checked)
-        
-        # 🟢 KRİTİK DÜZELTME: Metin güncellemesini asenkron yaparak ezilmeyi önle
+        item.setCheckState(Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked)
         QTimer.singleShot(10, self.updateText)
 
     def updateText(self):
         items = []
         for i in range(self.count()):
             item = self.model().item(i)
-            if item.checkState() == Qt.Checked:
-                items.append(item.text())
-        
-        text = ", ".join(items)
-        self.lineEdit().setText(text)
+            if item.checkState() == Qt.Checked: items.append(item.text())
+        self.lineEdit().setText(", ".join(items))
 
     def setCheckedItems(self, text_list):
-        if isinstance(text_list, str): 
-            text_list = [x.strip() for x in text_list.split(',')] if text_list else []
-        elif not text_list:
-            text_list = []
-            
+        if isinstance(text_list, str): text_list = [x.strip() for x in text_list.split(',')] if text_list else []
+        elif not text_list: text_list = []
         for i in range(self.count()):
             item = self.model().item(i)
             item.setCheckState(Qt.Checked if item.text() in text_list else Qt.Unchecked)
         self.updateText()
 
-    def getCheckedItems(self):
-        return self.lineEdit().text()
-
+    def getCheckedItems(self): return self.lineEdit().text()
     def addItem(self, text, data=None):
         item = QStandardItem(text)
         item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
         item.setData(Qt.Unchecked, Qt.CheckStateRole)
         self.model().appendRow(item)
-
     def addItems(self, texts):
         for text in texts: self.addItem(text)
 
@@ -130,7 +106,8 @@ class CheckableComboBox(QComboBox):
 # =============================================================================
 
 class VeriYukleyici(QThread):
-    veri_hazir = Signal(list, list, dict, list, list, list)
+    # Sinyal: RKE_Data, RKE_Combo, RKE_Dict, Muayene_List, Headers, Teknik_Aciklamalar, Personel_Listesi, Sorumlu_Listesi
+    veri_hazir = Signal(list, list, dict, list, list, list, list, list)
     hata_olustu = Signal(str)
 
     def run(self):
@@ -141,6 +118,10 @@ class VeriYukleyici(QThread):
             muayene_listesi = []
             headers = []
             teknik_aciklamalar = []
+            
+            # Personel listeleri (Geçmişten toplanacak)
+            kontrol_edenler = set()
+            birim_sorumlulari = set()
 
             # 1. RKE LİSTESİ
             ws_rke = veritabani_getir('rke', 'rke_list')
@@ -154,13 +135,29 @@ class VeriYukleyici(QThread):
                         rke_combo.append(display)
                         rke_dict[display] = ekipman_no
 
-            # 2. MUAYENE GEÇMİŞİ
+            # 2. MUAYENE GEÇMİŞİ & PERSONEL ANALİZİ
             ws_muayene = veritabani_getir('rke', 'rke_muayene')
             if ws_muayene:
                 raw_muayene = ws_muayene.get_all_values()
                 if len(raw_muayene) > 0:
-                    headers = raw_muayene[0]
+                    headers = [str(h).strip() for h in raw_muayene[0]]
                     muayene_listesi = raw_muayene[1:]
+                    
+                    # Sütun indekslerini bul
+                    try: idx_kontrol = headers.index("KontrolEden/Unvani")
+                    except: idx_kontrol = -1
+                    try: idx_sorumlu = headers.index("BirimSorumlusu/Unvani")
+                    except: idx_sorumlu = -1
+                    
+                    # Listeyi tara ve isimleri topla
+                    for row in muayene_listesi:
+                        if idx_kontrol != -1 and len(row) > idx_kontrol:
+                            val = str(row[idx_kontrol]).strip()
+                            if val: kontrol_edenler.add(val)
+                        
+                        if idx_sorumlu != -1 and len(row) > idx_sorumlu:
+                            val = str(row[idx_sorumlu]).strip()
+                            if val: birim_sorumlulari.add(val)
 
             # 3. SABİTLER (Teknik Açıklamalar)
             ws_sabit = veritabani_getir('sabit', 'Sabitler')
@@ -174,7 +171,16 @@ class VeriYukleyici(QThread):
             if not teknik_aciklamalar:
                 teknik_aciklamalar = ["Yırtık Yok", "Kurşun Bütünlüğü Tam", "Askılar Sağlam", "Temiz"]
 
-            self.veri_hazir.emit(rke_data, sorted(rke_combo), rke_dict, muayene_listesi, headers, sorted(teknik_aciklamalar))
+            self.veri_hazir.emit(
+                rke_data, 
+                sorted(rke_combo), 
+                rke_dict, 
+                muayene_listesi, 
+                headers, 
+                sorted(teknik_aciklamalar),
+                sorted(list(kontrol_edenler)),
+                sorted(list(birim_sorumlulari))
+            )
 
         except Exception as e:
             self.hata_olustu.emit(str(e))
@@ -211,16 +217,13 @@ class KayitWorker(QThread):
             ]
             ws_muayene.append_row(satir)
 
-            # ... (Önceki kodlar aynı) ...
-
-            # 🟢 GÜNCELLEME: rke_list GÜNCELLEMESİ
+            # rke_list GÜNCELLEMESİ
             self.progress.emit("Envanter durumu güncelleniyor...")
             ws_list = veritabani_getir('rke', 'rke_list')
             if ws_list:
                 ekipman_no = self.veri['EkipmanNo']
                 cell = ws_list.find(ekipman_no)
                 if cell:
-                    # Durum Hesapla
                     yeni_durum = envanter_durumunu_belirle(self.veri['FizikselDurum'], self.veri['SkopiDurum'])
                     
                     # Gelecek Kontrol Tarihi Hesapla (Skopi Tarihi + 1 Yıl)
@@ -228,13 +231,11 @@ class KayitWorker(QThread):
                     gelecek_kontrol_tarihi = ""
                     if skopi_tarih_str:
                         try:
-                            # String'i tarihe çevir -> 1 yıl ekle -> tekrar string yap
                             dt_obj = datetime.datetime.strptime(skopi_tarih_str, "%Y-%m-%d")
                             gelecek_kontrol_tarihi = (dt_obj + relativedelta(years=1)).strftime("%Y-%m-%d")
                         except:
-                            gelecek_kontrol_tarihi = skopi_tarih_str # Hata olursa aynısı kalsın
+                            gelecek_kontrol_tarihi = skopi_tarih_str 
 
-                    # Sütunları Bul
                     headers = ws_list.row_values(1)
                     try: col_tarih = headers.index("KontrolTarihi") + 1
                     except: col_tarih = -1
@@ -243,13 +244,9 @@ class KayitWorker(QThread):
                     try: col_aciklama = headers.index("Açiklama") + 1
                     except: col_aciklama = -1
                     
-                    # Güncelleme
-                    if col_tarih > 0 and gelecek_kontrol_tarihi: 
-                        ws_list.update_cell(cell.row, col_tarih, gelecek_kontrol_tarihi)
-                    if col_durum > 0: 
-                        ws_list.update_cell(cell.row, col_durum, yeni_durum)
-                    if col_aciklama > 0: 
-                        ws_list.update_cell(cell.row, col_aciklama, self.veri['Aciklamalar'])
+                    if col_tarih > 0 and gelecek_kontrol_tarihi: ws_list.update_cell(cell.row, col_tarih, gelecek_kontrol_tarihi)
+                    if col_durum > 0: ws_list.update_cell(cell.row, col_durum, yeni_durum)
+                    if col_aciklama > 0: ws_list.update_cell(cell.row, col_aciklama, self.veri['Aciklamalar'])
 
             self.finished.emit("Kayıt ve güncelleme başarılı.")
 
@@ -311,16 +308,13 @@ class TopluKayitWorker(QThread):
                 ]
                 rows_to_add.append(row)
                 
-                # ... (Önceki kodlar aynı) ...
-                
-                # 2. Envanter Güncelleme Verisi Hazırla
+                # 2. Envanter Güncelleme
                 try:
                     row_num = all_ekipman_nos.index(ekipman_no) + 1
                     yeni_genel_durum = envanter_durumunu_belirle(f_durum, s_durum)
                     
-                    # Gelecek Kontrol Tarihi Hesapla (Skopi Tarihi + 1 Yıl)
                     gelecek_kontrol_tarihi = ""
-                    if s_tarih: # s_tarih, skopi_aktif ise doludur
+                    if s_tarih:
                         try:
                             dt_obj = datetime.datetime.strptime(s_tarih, "%Y-%m-%d")
                             gelecek_kontrol_tarihi = (dt_obj + relativedelta(years=1)).strftime("%Y-%m-%d")
@@ -333,9 +327,7 @@ class TopluKayitWorker(QThread):
                         batch_updates.append({'range': f"{chr(64+col_durum)}{row_num}", 'values': [[yeni_genel_durum]]})
                     if col_aciklama > 0:
                         batch_updates.append({'range': f"{chr(64+col_aciklama)}{row_num}", 'values': [[self.ortak_veri['Aciklamalar']]]})
-                        
-                except ValueError:
-                    pass
+                except ValueError: pass
 
                 self.progress.emit(idx + 1, len(self.ekipman_listesi))
             
@@ -347,7 +339,7 @@ class TopluKayitWorker(QThread):
             self.error.emit(str(e))
 
 # =============================================================================
-# 3. UI BİLEŞENLERİ (ModernInputGroup, InfoCard) - KORUNDU
+# 3. UI BİLEŞENLERİ
 # =============================================================================
 class ModernInputGroup(QWidget):
     def __init__(self, label_text, widget, parent=None):
@@ -373,10 +365,12 @@ class InfoCard(QGroupBox):
 # 4. TOPLU MUAYENE DİALOG
 # =============================================================================
 class TopluMuayeneDialog(QDialog):
-    def __init__(self, secilen_ekipmanlar, teknik_aciklamalar, kullanici_adi=None, parent=None):
+    def __init__(self, secilen_ekipmanlar, teknik_aciklamalar, kontrol_listesi, sorumlu_listesi, kullanici_adi=None, parent=None):
         super().__init__(parent)
         self.ekipmanlar = secilen_ekipmanlar
         self.teknik_aciklamalar = teknik_aciklamalar
+        self.kontrol_listesi = kontrol_listesi
+        self.sorumlu_listesi = sorumlu_listesi
         self.kullanici_adi = kullanici_adi
         self.dosya_yolu = None
         self.setWindowTitle(f"Toplu Muayene ({len(self.ekipmanlar)} Adet)")
@@ -394,7 +388,7 @@ class TopluMuayeneDialog(QDialog):
         gb_fiz = QGroupBox("Fiziksel Muayene"); gb_fiz.setCheckable(True); gb_fiz.setChecked(True); self.chk_fiz = gb_fiz
         h_fiz = QHBoxLayout(gb_fiz)
         self.dt_fiz = QDateEdit(QDate.currentDate()); self.dt_fiz.setCalendarPopup(True)
-        self.cmb_fiz = QComboBox(); self.cmb_fiz.addItems(["Kulanıma Uygun", "Kullanıma Uygun Değil"])
+        self.cmb_fiz = QComboBox(); self.cmb_fiz.addItems(["Kullanıma Uygun", "Kullanıma Uygun Değil"])
         h_fiz.addWidget(QLabel("Tarih:")); h_fiz.addWidget(self.dt_fiz); h_fiz.addWidget(QLabel("Durum:")); h_fiz.addWidget(self.cmb_fiz)
         main_lay.addWidget(gb_fiz)
         
@@ -407,10 +401,16 @@ class TopluMuayeneDialog(QDialog):
         
         gb_ortak = QGroupBox("Ortak Bilgiler"); form_lay = QVBoxLayout(gb_ortak)
         h_pers = QHBoxLayout()
-        self.txt_kontrol = QLineEdit(); self.txt_kontrol.setPlaceholderText("Kontrol Eden")
-        if self.kullanici_adi: self.txt_kontrol.setText(self.kullanici_adi)
-        self.txt_sorumlu = QLineEdit(); self.txt_sorumlu.setPlaceholderText("Birim Sorumlusu")
-        h_pers.addWidget(QLabel("Kontrol Eden:")); h_pers.addWidget(self.txt_kontrol); h_pers.addWidget(QLabel("Sorumlu:")); h_pers.addWidget(self.txt_sorumlu)
+        # 🟢 GÜNCELLEME: QComboBox (Editable)
+        self.cmb_kontrol = QComboBox(); self.cmb_kontrol.setEditable(True); self.cmb_kontrol.setPlaceholderText("Kontrol Eden")
+        self.cmb_kontrol.addItems(self.kontrol_listesi); self.cmb_kontrol.completer().setCompletionMode(QCompleter.PopupCompletion)
+        if self.kullanici_adi: self.cmb_kontrol.setCurrentText(self.kullanici_adi)
+        
+        self.cmb_sorumlu = QComboBox(); self.cmb_sorumlu.setEditable(True); self.cmb_sorumlu.setPlaceholderText("Birim Sorumlusu")
+        self.cmb_sorumlu.addItems(self.sorumlu_listesi); self.cmb_sorumlu.completer().setCompletionMode(QCompleter.PopupCompletion)
+        
+        h_pers.addWidget(QLabel("Kontrol Eden:")); h_pers.addWidget(self.cmb_kontrol)
+        h_pers.addWidget(QLabel("Sorumlu:")); h_pers.addWidget(self.cmb_sorumlu)
         form_lay.addLayout(h_pers)
         
         self.cmb_aciklama = CheckableComboBox()
@@ -440,8 +440,8 @@ class TopluMuayeneDialog(QDialog):
         ortak_veri = {
             'F_MuayeneTarihi': self.dt_fiz.date().toString("yyyy-MM-dd"), 'FizikselDurum': self.cmb_fiz.currentText(),
             'S_MuayeneTarihi': self.dt_sko.date().toString("yyyy-MM-dd"), 'SkopiDurum': self.cmb_sko.currentText(),
-            'Aciklamalar': self.cmb_aciklama.getCheckedItems(), 'KontrolEden': self.txt_kontrol.text(),
-            'BirimSorumlusu': self.txt_sorumlu.text(), 'Not': "Toplu Kayıt"
+            'Aciklamalar': self.cmb_aciklama.getCheckedItems(), 'KontrolEden': self.cmb_kontrol.currentText(),
+            'BirimSorumlusu': self.cmb_sorumlu.currentText(), 'Not': "Toplu Kayıt"
         }
         self.btn_kaydet.setEnabled(False); self.pbar.setVisible(True); self.pbar.setRange(0, len(self.ekipmanlar))
         self.worker = TopluKayitWorker(self.ekipmanlar, ortak_veri, self.dosya_yolu, self.chk_fiz.isChecked(), self.chk_sko.isChecked())
@@ -457,6 +457,7 @@ class RKEMuayenePenceresi(QWidget):
         self.yetki = yetki; self.kullanici_adi = kullanici_adi
         self.setWindowTitle("RKE Muayene Girişi"); self.resize(1400, 850)
         self.rke_data = []; self.rke_dict = {}; self.tum_muayeneler = []; self.teknik_aciklamalar = []
+        self.kontrol_listesi = []; self.sorumlu_listesi = []
         self.secilen_dosya = None; self.header_map = {}; self.inputs = {}
         self.setup_ui()
         YetkiYoneticisi.uygula(self, "rke_muayene")
@@ -484,7 +485,7 @@ class RKEMuayenePenceresi(QWidget):
         card_detay = InfoCard("Muayene Detayları", color="#29b6f6")
         row_fiz = QHBoxLayout(); row_fiz.setSpacing(15)
         self.dt_fiziksel = QDateEdit(QDate.currentDate()); self.dt_fiziksel.setCalendarPopup(True); self.dt_fiziksel.setDisplayFormat("yyyy-MM-dd")
-        self.cmb_fiziksel = QComboBox(); self.cmb_fiziksel.setEditable(True); self.cmb_fiziksel.addItems(["Kulanıma Uygun", "Kullanıma Uygun Değil"])
+        self.cmb_fiziksel = QComboBox(); self.cmb_fiziksel.setEditable(True); self.cmb_fiziksel.addItems(["Kullanıma Uygun", "Kullanıma Uygun Değil"])
         self.add_input_to_layout(row_fiz, "Fiziksel Muayene Tarihi", self.dt_fiziksel, "tarih_f")
         self.add_input_to_layout(row_fiz, "Fiziksel Muayene Durumu", self.cmb_fiziksel, "durum_f")
         card_detay.add_layout(row_fiz)
@@ -500,11 +501,17 @@ class RKEMuayenePenceresi(QWidget):
         # 3. Sonuç
         card_sonuc = InfoCard("Sonuç ve Raporlama", color="#ffa726")
         row_pers = QHBoxLayout(); row_pers.setSpacing(15)
-        self.txt_kontrol = QLineEdit(); self.txt_kontrol.setPlaceholderText("Kontrol Eden")
-        if self.kullanici_adi: self.txt_kontrol.setText(str(self.kullanici_adi))
-        self.txt_sorumlu = QLineEdit(); self.txt_sorumlu.setPlaceholderText("Birim Sorumlusu")
-        self.add_input_to_layout(row_pers, "Kontrol Eden", self.txt_kontrol, "kontrol_eden")
-        self.add_input_to_layout(row_pers, "Birim Sorumlusu", self.txt_sorumlu, "birim_sorumlu")
+        
+        # 🟢 GÜNCELLEME: QComboBox (Editable)
+        self.cmb_kontrol = QComboBox(); self.cmb_kontrol.setEditable(True); self.cmb_kontrol.setPlaceholderText("Kontrol Eden")
+        self.cmb_kontrol.completer().setCompletionMode(QCompleter.PopupCompletion)
+        if self.kullanici_adi: self.cmb_kontrol.setCurrentText(str(self.kullanici_adi))
+        
+        self.cmb_sorumlu = QComboBox(); self.cmb_sorumlu.setEditable(True); self.cmb_sorumlu.setPlaceholderText("Birim Sorumlusu")
+        self.cmb_sorumlu.completer().setCompletionMode(QCompleter.PopupCompletion)
+        
+        self.add_input_to_layout(row_pers, "Kontrol Eden", self.cmb_kontrol, "KontrolEden/Unvani")
+        self.add_input_to_layout(row_pers, "Birim Sorumlusu", self.cmb_sorumlu, "BirimSorumlusu/Unvani")
         card_sonuc.add_layout(row_pers)
         
         self.cmb_aciklama = CheckableComboBox()
@@ -512,7 +519,7 @@ class RKEMuayenePenceresi(QWidget):
         
         file_cont = QWidget(); fl = QHBoxLayout(file_cont); fl.setContentsMargins(0,0,0,0)
         self.lbl_dosya = QLabel("Rapor Yok"); self.lbl_dosya.setStyleSheet("color: #777; font-style: italic;")
-        btn_dosya = QPushButton("📂 Rapor Yükle"); btn_dosya.setFixedSize(110, 35); btn_dosya.clicked.connect(self.dosya_sec)
+        btn_dosya = QPushButton("📂 Rapor Yükle"); btn_dosya.setFixedSize(150, 35); btn_dosya.clicked.connect(self.dosya_sec)
         fl.addWidget(self.lbl_dosya); fl.addWidget(btn_dosya)
         card_sonuc.add_widget(ModernInputGroup("Varsa Rapor", file_cont))
         form_layout.addWidget(card_sonuc)
@@ -537,7 +544,7 @@ class RKEMuayenePenceresi(QWidget):
         h_btn.addWidget(self.btn_temizle); h_btn.addWidget(self.btn_kaydet); sol_layout.addLayout(h_btn)
 
         # SAĞ PANEL
-        sag_widget = QWidget(); sag_layout = QVBoxLayout(sag_widget); sag_layout.setContentsMargins(10, 0, 0, 0); sag_layout.setSpacing(10)
+        sag_widget = QWidget(); sl = QVBoxLayout(sag_widget); sl.setContentsMargins(10, 0, 0, 0); sl.setSpacing(10)
         grp_filtre = QGroupBox("RKE Envanter Listesi"); grp_filtre.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         grp_filtre.setStyleSheet("QGroupBox { color: #29b6f6; font-weight: bold; font-size: 14px; }")
         hf = QHBoxLayout(grp_filtre); hf.setContentsMargins(10, 20, 10, 10)
@@ -545,10 +552,9 @@ class RKEMuayenePenceresi(QWidget):
         self.cmb_filtre_abd.currentIndexChanged.connect(self.tabloyu_filtrele)
         self.txt_ara = QLineEdit(); self.txt_ara.setPlaceholderText("Ara..."); self.txt_ara.textChanged.connect(self.tabloyu_filtrele)
         btn_yenile = QPushButton("⟳"); btn_yenile.setFixedSize(35, 35); btn_yenile.clicked.connect(self.verileri_yukle)
-        hf.addWidget(self.cmb_filtre_abd); hf.addWidget(self.txt_ara); hf.addWidget(btn_yenile); sl = sag_layout
-        sl.addWidget(grp_filtre)
+        hf.addWidget(self.cmb_filtre_abd); hf.addWidget(self.txt_ara); hf.addWidget(btn_yenile); sl.addWidget(grp_filtre)
         
-        self.tablo = QTableWidget(); self.cols_rke = ["EkipmanNo", "AnaBilimDali", "Birim", "KoruyucuCinsi", "KontrolTarihi", "Durum"]
+        self.tablo = QTableWidget(); self.cols_rke = ["EkipmanNo", "AnaBilimDali", "Birim", "KoruyucuCinsi", "KontrolTarihi", "Durum", ]
         self.tablo.setColumnCount(len(self.cols_rke))
         self.tablo.setHorizontalHeaderLabels(["Ekipman No", "ABD", "Birim", "Cinsi", "Kontrol Tarihi", "Durum"])
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -589,12 +595,20 @@ class RKEMuayenePenceresi(QWidget):
         self.loader.finished.connect(lambda: self.pbar.setVisible(False))
         self.loader.start()
 
-    def veriler_geldi(self, rke_data, rke_combo, rke_dict, muayene_list, headers, teknik_aciklamalar):
+    def veriler_geldi(self, rke_data, rke_combo, rke_dict, muayene_list, headers, teknik_aciklamalar, kontrol_edenler, birim_sorumlulari):
         self.rke_data = rke_data; self.rke_dict = rke_dict; self.tum_muayeneler = muayene_list
         self.header_map = {h.strip(): i for i, h in enumerate(headers)}
         self.teknik_aciklamalar = teknik_aciklamalar
+        self.kontrol_listesi = kontrol_edenler
+        self.sorumlu_listesi = birim_sorumlulari
+        
         self.cmb_rke.blockSignals(True); self.cmb_rke.clear(); self.cmb_rke.addItems(rke_combo); self.cmb_rke.blockSignals(False)
         self.cmb_aciklama.clear(); self.cmb_aciklama.addItems(self.teknik_aciklamalar)
+        
+        # Personel Combo Doldurma
+        self.cmb_kontrol.clear(); self.cmb_kontrol.addItems(self.kontrol_listesi)
+        if self.kullanici_adi: self.cmb_kontrol.setCurrentText(str(self.kullanici_adi))
+        self.cmb_sorumlu.clear(); self.cmb_sorumlu.addItems(self.sorumlu_listesi)
         
         abd = set([str(row.get("AnaBilimDali", "")).strip() for row in rke_data if str(row.get("AnaBilimDali", "")).strip()])
         self.cmb_filtre_abd.blockSignals(True); self.cmb_filtre_abd.clear(); self.cmb_filtre_abd.addItem("Tüm ABD"); self.cmb_filtre_abd.addItems(sorted(list(abd))); self.cmb_filtre_abd.blockSignals(False)
@@ -651,8 +665,8 @@ class RKEMuayenePenceresi(QWidget):
     def temizle(self):
         self.cmb_rke.setCurrentIndex(-1)
         self.dt_fiziksel.setDate(QDate.currentDate()); self.dt_skopi.setDate(QDate.currentDate())
-        self.txt_kontrol.clear(); self.txt_sorumlu.clear()
-        if self.kullanici_adi: self.txt_kontrol.setText(str(self.kullanici_adi))
+        self.cmb_kontrol.setCurrentText(""); self.cmb_sorumlu.setCurrentText("")
+        if self.kullanici_adi: self.cmb_kontrol.setCurrentText(str(self.kullanici_adi))
         self.cmb_fiziksel.setCurrentIndex(0); self.cmb_skopi.setCurrentIndex(0)
         self.cmb_aciklama.setCheckedItems([]); self.lbl_dosya.setText("Rapor Seçilmedi"); self.secilen_dosya = None
         self.tbl_gecmis.setRowCount(0)
@@ -669,7 +683,7 @@ class RKEMuayenePenceresi(QWidget):
             'S_MuayeneTarihi': self.dt_skopi.date().toString("yyyy-MM-dd"),
             'SkopiDurum': self.cmb_skopi.currentText(),
             'Aciklamalar': self.cmb_aciklama.getCheckedItems(),
-            'KontrolEden': self.txt_kontrol.text(), 'BirimSorumlusu': self.txt_sorumlu.text(),
+            'KontrolEden': self.cmb_kontrol.currentText(), 'BirimSorumlusu': self.cmb_sorumlu.currentText(),
             'Not': "" 
         }
         self.pbar.setVisible(True); self.pbar.setRange(0, 0); self.btn_kaydet.setEnabled(False)
@@ -686,7 +700,7 @@ class RKEMuayenePenceresi(QWidget):
         secili = self.tablo.selectionModel().selectedRows()
         if not secili: show_info("Uyarı", "Ekipman seçin.", self); return
         ekipmanlar = sorted(list(set([self.tablo.item(i.row(), 0).data(Qt.UserRole) for i in secili if self.tablo.item(i.row(), 0)])))
-        dlg = TopluMuayeneDialog(ekipmanlar, self.teknik_aciklamalar, self.kullanici_adi, self)
+        dlg = TopluMuayeneDialog(ekipmanlar, self.teknik_aciklamalar, self.kontrol_listesi, self.sorumlu_listesi, self.kullanici_adi, self)
         if dlg.exec() == QDialog.Accepted:
             show_info("Bilgi", "Toplu kayıt başarılı.", self); self.verileri_yukle()
 
