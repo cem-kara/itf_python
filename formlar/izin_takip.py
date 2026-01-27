@@ -2,649 +2,329 @@
 import sys
 import os
 import logging
-import uuid
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 
 # PySide6 Kütüphaneleri
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+                               QTableWidgetItem, QPushButton, QDateEdit, 
+                               QComboBox, QLineEdit, QProgressBar, QGroupBox, 
+                               QHeaderView, QMessageBox, QApplication, QMenu)
+from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, 
-    QDateEdit, QSpinBox, QFrame, QAbstractItemView, QMessageBox,
-    QGroupBox, QScrollArea, QSplitter, QLineEdit, QAbstractSpinBox, QProgressBar, QGridLayout, QApplication
-)
 
 # --- YOL AYARLARI ---
-# Dosyanın 'formlar' klasöründe olduğu varsayılarak proje kök dizini eklenir
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
-# --- PROJE MODÜLLERİ ---
+# --- MODÜLLER ---
 try:
     from araclar.yetki_yonetimi import YetkiYoneticisi
-    # Tema Yöneticisi
+    from araclar.ortak_araclar import OrtakAraclar, show_info, show_error, show_question, pencereyi_kapat, kayitlari_getir, satir_ekle
     from temalar.tema import TemaYonetimi
-    
-    # Hata sınıflarını ve veritabanı fonksiyonunu alıyoruz
-    from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi
-    
-    # Ortak Araçlar
-    from araclar.ortak_araclar import (
-        pencereyi_kapat, show_info, show_error, show_question,
-        create_group_box, create_form_layout, kayitlari_getir, 
-        add_combo_box, add_date_edit, satir_ekle
-    )
+    from google_baglanti import veritabani_getir
 except ImportError as e:
-    print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
+    print(f"Modül Hatası: {e}")
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("IzinGiris")
 
-# =============================================================================
-# WORKER: VERİLERİ YÜKLE (MANTIK KORUNDU)
-# =============================================================================
-class VeriYukleyici(QThread):
-    veri_hazir = Signal(dict)
-    hata_olustu = Signal(str) 
+# ================= WORKERLAR =================
+
+class IzinGecmisiWorker(QThread):
+    veri_indi = Signal(list)
     
-    def run(self):
-        data = {
-            'hizmet_siniflari': [],
-            'izin_tipleri': [],
-            'personel': [], 
-            'izinler': [],
-            'izin_bilgi': []
-        }
-        try:
-            # 1. SABİTLER
-            sabitler = kayitlari_getir(veritabani_getir, 'sabit', 'Sabitler')
-            h_siniflari = set()
-            i_tipleri = set()
-            
-            if sabitler:
-                for s in sabitler:
-                    kod = str(s.get('Kod', '')).strip()
-                    eleman = str(s.get('MenuEleman', '')).strip()
-                    
-                    if kod == 'Hizmet_Sinifi' and eleman:
-                        h_siniflari.add(eleman)
-                    elif kod in ['İzin_Tipi', 'Izin_Tipi'] and eleman:
-                        i_tipleri.add(eleman)
-            
-            data['hizmet_siniflari'] = sorted(list(h_siniflari))
-            data['hizmet_siniflari'].insert(0, "Seçiniz...")
-            
-            data['izin_tipleri'] = sorted(list(i_tipleri))
-            data['izin_tipleri'].insert(0, "Seçiniz...")
-
-            # 2. PERSONEL LİSTESİ
-            personeller = kayitlari_getir(veritabani_getir, 'personel', 'Personel')
-            pers_list = []
-            if personeller:
-                for p in personeller:
-                    tc = str(p.get('Kimlik_No', '')).strip()
-                    ad = str(p.get('Ad_Soyad', '')).strip()
-                    sinif = str(p.get('Hizmet_Sinifi', '')).strip()
-                    
-                    if ad: 
-                        pers_list.append({'ad': ad, 'tc': tc, 'sinif': sinif})
-            
-            data['personel'] = pers_list
-
-            # 3. İZİN GEÇMİŞİ
-            tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
-            data['izinler'] = tum_izinler if tum_izinler else []
-
-            # 4. İZİN BİLGİ (BAKİYE)
-            bakiye = kayitlari_getir(veritabani_getir, 'personel', 'izin_bilgi')
-            data['izin_bilgi'] = bakiye if bakiye else []
-            
-            self.veri_hazir.emit(data)
-
-        except InternetBaglantiHatasi:
-            self.hata_olustu.emit("İnternet bağlantısı yok. Veriler yüklenemedi.")
-        except KimlikDogrulamaHatasi:
-            self.hata_olustu.emit("Oturum süresi doldu. Lütfen programı yeniden başlatın.")
-        except Exception as e:
-            logger.error(f"Veri yükleme hatası: {e}")
-            self.hata_olustu.emit(f"Veri yükleme hatası: {str(e)}")
-
-# =============================================================================
-# WORKER: KAYIT / GÜNCELLEME (MANTIK KORUNDU)
-# =============================================================================
-class KayitWorker(QThread):
-    islem_tamam = Signal()
-    hata_olustu = Signal(str)
-
-    def __init__(self, veri_sozlugu, islem_tipi="yeni"):
+    def __init__(self, tc_no):
         super().__init__()
-        self.data = veri_sozlugu
-        self.tip = islem_tipi
+        self.tc_no = tc_no 
 
     def run(self):
         try:
-            # --- A. İZİN GİRİŞ TABLOSUNA KAYIT ---
-            ws_giris = veritabani_getir('personel', 'izin_giris')
-            if not ws_giris: raise Exception("izin_giris tablosuna erişilemedi.")
+            tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
+            personel_izinleri = []
+            if tum_izinler:
+                for x in tum_izinler:
+                    p_id = str(x.get('personel_id', '')).strip()
+                    if p_id == str(self.tc_no).strip():
+                        personel_izinleri.append(x)
+            self.veri_indi.emit(personel_izinleri)
+        except Exception as e: 
+            self.veri_indi.emit([])
 
-            row_giris = [
-                self.data.get('Id'),
-                self.data.get('Hizmet_Sinifi'),
-                self.data.get('personel_id'),
-                self.data.get('Ad_Soyad'),
-                self.data.get('izin_tipi'),
-                self.data.get('Baslama_Tarihi'),
-                self.data.get('Gun'),
-                self.data.get('Bitis_Tarihi')
-            ]
-
-            if self.tip == "yeni":
-                ws_giris.append_row(row_giris)
-            elif self.tip == "guncelle":
-                cell = ws_giris.find(self.data.get('Id'))
-                if cell:
-                    ws_giris.update(f"A{cell.row}:H{cell.row}", [row_giris])
-                else:
-                    raise Exception("Güncellenecek kayıt bulunamadı.")
-
-            # --- B. İZİN BİLGİ (BAKİYE) GÜNCELLEME ---
-            if self.tip == "yeni":
-                ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
-                
-                hedef_tc = str(self.data.get('personel_id')).strip()
-                izin_tipi = str(self.data.get('izin_tipi')).strip().lower() 
-                gun_sayisi = int(self.data.get('Gun', 0))
-                baslama_tarihi_str = str(self.data.get('Baslama_Tarihi'))
-
-                try:
-                    tarih_obj = datetime.strptime(baslama_tarihi_str, "%d.%m.%Y")
-                    izin_yili = tarih_obj.year
-                    suanki_yil = datetime.now().year
-                except:
-                    izin_yili = 0
-                    suanki_yil = 1
-
-                try:
-                    kimlik_kolonu = ws_bilgi.col_values(2) 
-                    row_idx = kimlik_kolonu.index(hedef_tc) + 1 
-                except ValueError:
-                    row_idx = None
-
-                if row_idx:
-                    def safe_int(row, col):
-                        val = ws_bilgi.cell(row, col).value
-                        if val and str(val).replace('.', '', 1).isdigit():
-                            return int(float(val))
-                        return 0
-
-                    if "yıllık" in izin_tipi:
-                        hak_edilen = safe_int(row_idx, 4)
-                        devir = safe_int(row_idx, 5)
-                        kullanilan = safe_int(row_idx, 7)
-                        
-                        ws_bilgi.update_cell(row_idx, 7, kullanilan + gun_sayisi)
-                        
-                        dusulecek = gun_sayisi
-                        
-                        if devir >= dusulecek:
-                            devir -= dusulecek
-                            dusulecek = 0
-                        else:
-                            dusulecek -= devir
-                            devir = 0
-                        
-                        hak_edilen -= dusulecek
-                        yeni_kalan = hak_edilen + devir
-                        
-                        ws_bilgi.update_cell(row_idx, 4, hak_edilen)
-                        ws_bilgi.update_cell(row_idx, 5, devir)
-                        ws_bilgi.update_cell(row_idx, 8, yeni_kalan)
-
-                        if izin_yili == suanki_yil:
-                            bu_yil_yillik = safe_int(row_idx, 11)
-                            ws_bilgi.update_cell(row_idx, 11, bu_yil_yillik + gun_sayisi)
-
-                    else:
-                        if "şua" in izin_tipi or "sua" in izin_tipi:
-                            kul_sua = safe_int(row_idx, 10)
-                            ws_bilgi.update_cell(row_idx, 10, kul_sua + gun_sayisi)
-                        
-                        if izin_yili == suanki_yil:
-                            bu_yil_diger = safe_int(row_idx, 12)
-                            ws_bilgi.update_cell(row_idx, 12, bu_yil_diger + gun_sayisi)
-
-            self.islem_tamam.emit()
-
-        except InternetBaglantiHatasi:
-            self.hata_olustu.emit("İnternet bağlantısı kesildi. Kayıt yapılamadı.")
-        except KimlikDogrulamaHatasi:
-            self.hata_olustu.emit("Google oturumu kapandı. Lütfen tekrar giriş yapın.")
-        except Exception as e:
-            self.hata_olustu.emit(f"Kayıt hatası: {str(e)}")
-
-# =============================================================================
-# WORKER: SİLME (MANTIK KORUNDU)
-# =============================================================================
-class SilWorker(QThread):
+class IzinKayitWorker(QThread):
     islem_tamam = Signal()
     hata_olustu = Signal(str)
+    
+    def __init__(self, veri):
+        super().__init__()
+        self.veri = veri # [Id, Hizmet_Sinifi, personel_id, Ad_Soyad, izin_tipi, Başlama_Tarihi, Gun, Bitiş_Tarihi, Durum]
+
+    def run(self):
+        try:
+            # 1. MÜKERRERLİK KONTROLÜ
+            personel_id = str(self.veri[2]).strip()
+            yeni_baslama = str(self.veri[5]).strip()
+            
+            tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
+            
+            if tum_izinler:
+                for kayit in tum_izinler:
+                    durum = str(kayit.get('Durum', '')).strip()
+                    
+                    # 🟢 ÖNEMLİ GÜNCELLEME: Eğer izin zaten iptal edilmişse çakışma sayma!
+                    if durum == "İptal Edildi":
+                        continue
+
+                    mevcut_id = str(kayit.get('personel_id', '')).strip()
+                    mevcut_baslama = str(kayit.get('Başlama_Tarihi', '')).strip()
+                    
+                    if mevcut_id == personel_id and mevcut_baslama == yeni_baslama:
+                        raise Exception(f"Bu personelin {yeni_baslama} tarihinde aktif bir izin kaydı zaten mevcut!")
+
+            # 2. Kayıt İşlemi
+            basari = satir_ekle(veritabani_getir, 'personel', 'izin_giris', self.veri)
+            if basari: 
+                self.islem_tamam.emit()
+            else: 
+                raise Exception("Kayıt işlemi başarısız oldu (API hatası).")
+        except Exception as e: 
+            self.hata_olustu.emit(str(e))
+
+# 🟢 YENİ WORKER: İPTAL İŞLEMİ İÇİN
+class IzinIptalWorker(QThread):
+    islem_tamam = Signal()
+    hata_olustu = Signal(str)
+    
     def __init__(self, kayit_id):
         super().__init__()
-        self.kid = kayit_id
+        self.kayit_id = kayit_id
+
     def run(self):
         try:
             ws = veritabani_getir('personel', 'izin_giris')
-            cell = ws.find(self.kid)
+            cell = ws.find(str(self.kayit_id)) # ID'ye göre satırı bul
+            
             if cell:
-                ws.delete_rows(cell.row)
+                # Durum sütununu bul (Başlıklardan 'Durum'u arıyoruz)
+                basliklar = ws.row_values(1)
+                try:
+                    # Google Sheets index 1'den başlar, python list 0'dan. +1 ekliyoruz.
+                    col_idx = basliklar.index("Durum") + 1
+                except ValueError:
+                    # Eğer Durum başlığı yoksa son sütun varsayalım (Riskli ama yedek plan)
+                    col_idx = 9 
+                
+                ws.update_cell(cell.row, col_idx, "İptal Edildi")
                 self.islem_tamam.emit()
-            else: self.hata_olustu.emit("Silinecek kayıt bulunamadı.")
-        
-        except InternetBaglantiHatasi:
-            self.hata_olustu.emit("İnternet bağlantısı yok. Silme işlemi yapılamadı.")
-        except Exception as e: 
-            self.hata_olustu.emit(f"Silme hatası: {str(e)}")
+            else:
+                raise Exception("İlgili kayıt veritabanında bulunamadı.")
+        except Exception as e:
+            self.hata_olustu.emit(str(e))
 
-# =============================================================================
-# ANA FORM
-# =============================================================================
-class IzinGirisPenceresi(QWidget):
-    def __init__(self, yetki='viewer', kullanici_adi=None):
+# ================= ANA FORM =================
+
+class IzinTakipPenceresi(QWidget):
+    def __init__(self, personel_data, yetki='viewer', kullanici_adi=None):
         super().__init__()
-        self.yetki = yetki
-        self.kullanici_adi = kullanici_adi
+        self.p_data = personel_data 
+        self.tc_no = str(personel_data[0]) 
+        self.ad_soyad = str(personel_data[1])
         
-        self.setWindowTitle("Personel İzin İşlemleri")
-        self.resize(1350, 850)
+        try: self.hizmet_sinifi = str(personel_data[4])
+        except IndexError: self.hizmet_sinifi = "Belirtilmemiş"
         
-        self.tum_personel = []
-        self.tum_izinler = []
-        self.tum_bakiye = []
-        self.duzenleme_modu = False
-        self.ui = {}
-
+        self.setWindowTitle(f"İzin Girişi - {self.ad_soyad}")
+        self.resize(1000, 600)
         self._setup_ui()
-        # Verileri Yükle
         self._verileri_yukle()
         
-        # Yetki Kuralı
-        YetkiYoneticisi.uygula(self, "izin_giris")
+        YetkiYoneticisi.uygula(self, "izin_takip")
 
     def _setup_ui(self):
         main_layout = QHBoxLayout(self)
         
-        # --- SOL TARAF ---
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0,0,0,0)
-
-        # 1. GİRİŞ KUTUSU
-        grp_giris = create_group_box("İzin Giriş / Düzenleme")
-        form_layout = create_form_layout()
-
-        self.txt_id = QLineEdit()
-        self.txt_id.setVisible(False)
-
-        self.ui['sinif'] = add_combo_box(form_layout, "Hizmet Sınıfı:", items=["Yükleniyor..."])
-        self.ui['sinif'].currentIndexChanged.connect(self._on_sinif_changed)
-
-        self.ui['personel'] = add_combo_box(form_layout, "Personel:", items=[])
-        self.ui['personel'].setEditable(True)
-        self.ui['personel'].currentIndexChanged.connect(self._on_personel_changed)
-
-        self.ui['izin_tipi'] = add_combo_box(form_layout, "İzin Tipi:", items=["Yükleniyor..."])
-
-        h_tarih = QHBoxLayout()
-        self.ui['baslama'] = QDateEdit()
-        self.ui['baslama'].setCalendarPopup(True)
-        self.ui['baslama'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['baslama'].setDate(QDate.currentDate())
-        self.ui['baslama'].setFixedHeight(35)
-        self.ui['baslama'].dateChanged.connect(self._tarih_hesapla)
+        # --- SOL PANEL ---
+        sol_panel = QGroupBox(f"Yeni İzin ({self.hizmet_sinifi})")
+        sol_layout = QVBoxLayout(sol_panel)
+        sol_layout.setSpacing(15)
         
-        self.ui['gun'] = QSpinBox()
-        self.ui['gun'].setRange(1, 365)
-        self.ui['gun'].setValue(1)
-        self.ui['gun'].setFixedHeight(35)
-        self.ui['gun'].valueChanged.connect(self._tarih_hesapla)
+        self.cmb_tur = OrtakAraclar.create_combo_box(sol_panel)
+        self.cmb_tur.addItems(["Yıllık İzin", "Rapor", "Mazeret İzni", "Ücretsiz İzin", "İdari İzin", "Ölüm İzni", "Evlilik İzni"])
         
-        h_tarih.addWidget(self.ui['baslama'])
-        h_tarih.addWidget(QLabel("  Süre (Gün):"))
-        h_tarih.addWidget(self.ui['gun'])
-        form_layout.addRow("Başlama Tarihi:", h_tarih)
-
-        self.ui['bitis'] = QDateEdit()
-        self.ui['bitis'].setReadOnly(True)
-        self.ui['bitis'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['bitis'].setButtonSymbols(QAbstractSpinBox.NoButtons)
-        # Manuel stil temizlendi, tema yönetecek
-        self.ui['bitis'].setFixedHeight(35)
-        form_layout.addRow("Bitiş Tarihi:", self.ui['bitis'])
-
-        h_btn = QHBoxLayout()
+        self.dt_baslama = QDateEdit(QDate.currentDate())
+        self.dt_baslama.setCalendarPopup(True); self.dt_baslama.setDisplayFormat("dd.MM.yyyy")
+        self.dt_baslama.setMinimumHeight(40)
         
-        self.btn_temizle = QPushButton("Yeni Kayıt")
-        self.btn_temizle.setObjectName("btn_temizle")
-        self.btn_temizle.setFixedHeight(40)
-        self.btn_temizle.clicked.connect(self._formu_temizle)
+        self.dt_bitis = QDateEdit(QDate.currentDate().addDays(1))
+        self.dt_bitis.setCalendarPopup(True); self.dt_bitis.setDisplayFormat("dd.MM.yyyy")
+        self.dt_bitis.setMinimumHeight(40)
         
-        self.btn_kaydet = QPushButton("KAYDET")
-        self.btn_kaydet.setObjectName("btn_kaydet") # Tema ID'si
-        self.btn_kaydet.setFixedHeight(40)
-        # Varsayılan mavi stil temadan gelecek
-        self.btn_kaydet.clicked.connect(self._kaydet_baslat)
-
-        h_btn.addWidget(self.btn_temizle)
-        h_btn.addWidget(self.btn_kaydet)
-        form_layout.addRow(h_btn)
-
-        grp_giris.setLayout(form_layout)
-        left_layout.addWidget(grp_giris)
-
-        # 2. BİLGİ PANELİ
-        grp_bilgi = create_group_box("Personel İzin Durumu")
-        bilgi_layout = QGridLayout()
-        bilgi_layout.setSpacing(10)
-
-        self.lbl_devir = QLabel("-")
-        self.lbl_hakedilen = QLabel("-")
-        self.lbl_kullanilan = QLabel("-")
-        self.lbl_kalan = QLabel("-")
-        self.lbl_hak_sua = QLabel("-")
-        self.lbl_kul_sua = QLabel("-")
-
-        # Özel veri gösterimi olduğu için bu stilleri koruyoruz/sadeleştiriyoruz
-        val_style = "font-weight: bold; color: #4caf50; font-size: 13px;"
+        self.lbl_gun = QLabel("Süre: 1 Gün")
+        self.lbl_gun.setStyleSheet("color: #60cdff; font-weight: bold; font-size: 16px; margin-top: 5px;")
         
-        bilgi_layout.addWidget(QLabel("Devreden İzin:"), 0, 0)
-        self.lbl_devir.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_devir, 0, 1)
-
-        bilgi_layout.addWidget(QLabel("Hak Edilen İzin:"), 1, 0)
-        self.lbl_hakedilen.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_hakedilen, 1, 1)
-
-        bilgi_layout.addWidget(QLabel("Kullanılan Yıllık İzin:"), 2, 0)
-        self.lbl_kullanilan.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_kullanilan, 2, 1)
-
-        bilgi_layout.addWidget(QLabel("Kullanılan Diğer İzin:"), 3, 0)
-        self.lbl_kullanilan.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_kullanilan, 3, 1)
-
-        bilgi_layout.addWidget(QLabel("KALAN İZİN:"), 4, 0)
-        self.lbl_kalan.setStyleSheet("font-weight: bold; color: #2196f3; font-size: 15px;")
-        bilgi_layout.addWidget(self.lbl_kalan, 4, 1)
-
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        bilgi_layout.addWidget(line, 5, 0, 1, 2)
-
-        bilgi_layout.addWidget(QLabel("Hak Edilen Şua:"), 6, 0)
-        self.lbl_hak_sua.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_hak_sua, 6, 1)
+        self.dt_baslama.dateChanged.connect(self._gun_hesapla)
+        self.dt_bitis.dateChanged.connect(self._gun_hesapla)
         
-        bilgi_layout.addWidget(QLabel("Kullanılan Şua:"), 7, 0)
-        self.lbl_kul_sua.setStyleSheet(val_style)
-        bilgi_layout.addWidget(self.lbl_kul_sua, 7, 1)
+        self.btn_kaydet = OrtakAraclar.create_button(sol_panel, "💾 İzni Kaydet", self._kaydet)
+        self.btn_kaydet.setObjectName("btn_kaydet")
 
-        grp_bilgi.setLayout(bilgi_layout)
-        left_layout.addWidget(grp_bilgi)
+        sol_layout.addWidget(QLabel("İzin Tipi:"))
+        sol_layout.addWidget(self.cmb_tur)
+        sol_layout.addWidget(QLabel("Başlama Tarihi:"))
+        sol_layout.addWidget(self.dt_baslama)
+        sol_layout.addWidget(QLabel("Bitiş Tarihi (İşe Başlama):"))
+        sol_layout.addWidget(self.dt_bitis)
+        sol_layout.addWidget(self.lbl_gun)
+        sol_layout.addStretch()
+        sol_layout.addWidget(self.btn_kaydet)
         
-        left_layout.addStretch()
-
-        # --- SAĞ TARAF ---
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0,0,0,0)
-
-        grp_genel = create_group_box("Tüm Personel İzin Listesi")
-        v_genel = QVBoxLayout()
-
-        self.txt_ara = QLineEdit()
-        self.txt_ara.setPlaceholderText("🔍 TC veya Ad Soyad ile Ara...")
-        self.txt_ara.setFixedHeight(35)
-        self.txt_ara.textChanged.connect(self._genel_liste_filtrele)
-        v_genel.addWidget(self.txt_ara)
-
-        self.table_genel = QTableWidget()
-        self.table_genel.setColumnCount(6)
-        self.table_genel.setHorizontalHeaderLabels(["TC Kimlik", "Personel Adı", "İzin Tip", "Başlama", "Gün", "Bitiş"])
-        self.table_genel.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table_genel.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table_genel.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table_genel.cellDoubleClicked.connect(self._satir_secildi)
+        # --- SAĞ PANEL ---
+        sag_panel = QGroupBox("İzin Geçmişi")
+        sag_layout = QVBoxLayout(sag_panel)
         
-        v_genel.addWidget(self.table_genel)
-        grp_genel.setLayout(v_genel)
-        right_layout.addWidget(grp_genel)
-
-        # --- SPLITTER ---
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3)
-        splitter.setHandleWidth(5)
-        main_layout.addWidget(splitter)
+        headers = ["Id", "İzin Tipi", "Başlama", "Bitiş", "Gün", "Durum"]
+        self.table = OrtakAraclar.create_table(self, headers)
+        
+        # ID sütununu gizle (Kullanıcı görmesin ama biz kullanalım)
+        self.table.setColumnHidden(0, True)
+        
+        # 🟢 SAĞ TIK MENÜSÜ AKTİF
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._sag_tik_menu)
+        
+        sag_layout.addWidget(self.table)
+        
+        main_layout.addWidget(sol_panel, 35)
+        main_layout.addWidget(sag_panel, 65)
         
         self.progress = QProgressBar(self)
         self.progress.setVisible(False)
-        self.progress.setStyleSheet("QProgressBar { max-height: 5px; background: #333; border:none; } QProgressBar::chunk { background: #00ccff; }")
-        self.progress.setGeometry(0, 0, self.width(), 5)
+        self.progress.setStyleSheet("QProgressBar {border: 0px; background-color: transparent;} QProgressBar::chunk {background-color: #60cdff;}")
+        self.progress.setGeometry(0, 0, self.width(), 4)
 
-    # --- LOJİK İŞLEMLER ---
+    def _gun_hesapla(self):
+        d1 = self.dt_baslama.date()
+        d2 = self.dt_bitis.date()
+        gun = d1.daysTo(d2)
+        if gun <= 0: 
+            self.lbl_gun.setText("⚠️ Hatalı Tarih!")
+            self.lbl_gun.setStyleSheet("color: #e81123; font-weight: bold; font-size: 16px;")
+            self.btn_kaydet.setEnabled(False)
+        else:
+            self.lbl_gun.setText(f"Süre: {gun} Gün")
+            self.lbl_gun.setStyleSheet("color: #60cdff; font-weight: bold; font-size: 16px;")
+            self.btn_kaydet.setEnabled(True)
+
     def _verileri_yukle(self):
-        self.progress.setVisible(True); self.progress.setRange(0,0)
-        self.worker = VeriYukleyici()
-        self.worker.veri_hazir.connect(self._veriler_geldi)
-        self.worker.hata_olustu.connect(self._hata_goster)
+        self.progress.setVisible(True)
+        self.table.setRowCount(0)
+        self.worker = IzinGecmisiWorker(self.tc_no)
+        self.worker.veri_indi.connect(self._tablo_doldur)
         self.worker.start()
 
-    def _veriler_geldi(self, data):
+    def _tablo_doldur(self, veri):
         self.progress.setVisible(False)
-        self.ui['sinif'].clear()
-        self.ui['sinif'].addItems(data.get('hizmet_siniflari', []))
-        self.ui['izin_tipi'].clear()
-        self.ui['izin_tipi'].addItems(data.get('izin_tipleri', []))
-        self.tum_personel = data.get('personel', [])
-        self._on_sinif_changed() 
-        self.tum_izinler = data.get('izinler', [])
-        self.tum_bakiye = data.get('izin_bilgi', [])
-        self._genel_tabloyu_doldur(self.tum_izinler)
-        self._tarih_hesapla()
-
-    def _on_sinif_changed(self):
-        secilen_sinif = self.ui['sinif'].currentText().strip()
-        self.ui['personel'].blockSignals(True)
-        self.ui['personel'].clear()
-        self.ui['personel'].addItem("Seçiniz...")
-        for p in self.tum_personel:
-            p_sinif = str(p.get('sinif', '')).strip()
-            if secilen_sinif == "Seçiniz..." or p_sinif == secilen_sinif:
-                self.ui['personel'].addItem(p['ad'], p['tc'])
-        self.ui['personel'].blockSignals(False)
-
-    def _on_personel_changed(self):
-        current_text = self.ui['personel'].currentText().strip()
-        secilen_tc = self.ui['personel'].currentData()
-
-        if not secilen_tc:
-            for p in self.tum_personel:
-                if p['ad'] == current_text:
-                    secilen_tc = p['tc']
-                    break
+        if not veri: return
         
-        self.txt_ara.blockSignals(True)
-        self.txt_ara.clear()
-        self.txt_ara.blockSignals(False)
+        self.table.setRowCount(len(veri))
+        for i, row in enumerate(reversed(veri)):
+            # Id, İzin Tipi, Başlama, Bitiş, Gün, Durum
+            self.table.setItem(i, 0, QTableWidgetItem(str(row.get('Id', '')))) # Gizli Sütun
+            self.table.setItem(i, 1, QTableWidgetItem(str(row.get('izin_tipi', ''))))
+            self.table.setItem(i, 2, QTableWidgetItem(str(row.get('Başlama_Tarihi', ''))))
+            self.table.setItem(i, 3, QTableWidgetItem(str(row.get('Bitiş_Tarihi', ''))))
+            self.table.setItem(i, 4, QTableWidgetItem(str(row.get('Gun', ''))))
+            
+            durum = str(row.get('Durum', ''))
+            item_durum = QTableWidgetItem(durum)
+            
+            # Renklendirme
+            if durum == "İşlendi": 
+                item_durum.setForeground(Qt.green)
+            elif durum == "İptal Edildi": 
+                item_durum.setForeground(Qt.red)
+                # İptal edilen satırı komple gri yapalım (Görsel ayrım için)
+                for col in range(6):
+                    item = self.table.item(i, col)
+                    if item: item.setForeground(Qt.gray)
+            else: 
+                item_durum.setForeground(Qt.yellow)
+            
+            self.table.setItem(i, 5, item_durum)
 
-        if not secilen_tc or current_text == "Seçiniz...":
-            self._genel_tabloyu_doldur(self.tum_izinler)
-            self._bilgi_paneli_sifirla()
-            return
-
-        filtrelenmis_liste = []
-        for row in self.tum_izinler:
-            vt_tc = str(row.get('personel_id', '')).strip()
-            if vt_tc == str(secilen_tc):
-                filtrelenmis_liste.append(row)
-        self._genel_tabloyu_doldur(filtrelenmis_liste)
-
-        kayit_bulundu = False
-        for row in self.tum_bakiye:
-            if str(row.get('Kimlik_No', '')).strip() == str(secilen_tc):
-                self.lbl_devir.setText(str(row.get('Devir', '-')))
-                self.lbl_hakedilen.setText(str(row.get('Hak_Edilen', '-')))
-                self.lbl_kullanilan.setText(str(row.get('Toplam', '-')))
-                self.lbl_kalan.setText(str(row.get('Kalan', '-')))
-                self.lbl_hak_sua.setText(str(row.get('Hak_Edilen_sua', '-')))
-                self.lbl_kul_sua.setText(str(row.get('Kullanilan_sua', '-')))
-                kayit_bulundu = True
-                break
+    # 🟢 SAĞ TIK MENÜSÜ
+    def _sag_tik_menu(self, pos):
+        row = self.table.currentRow()
+        if row < 0: return
         
-        if not kayit_bulundu:
-            self._bilgi_paneli_sifirla()
-
-    def _bilgi_paneli_sifirla(self):
-        for lbl in [self.lbl_devir, self.lbl_hakedilen, self.lbl_kullanilan, 
-                    self.lbl_kalan, self.lbl_hak_sua, self.lbl_kul_sua]:
-            lbl.setText("-")
-
-    def _tarih_hesapla(self):
-        baslama = self.ui['baslama'].date()
-        gun = self.ui['gun'].value()
-        bitis = baslama.addDays(gun - 1)
-        self.ui['bitis'].setDate(bitis)
-
-    def _genel_tabloyu_doldur(self, veri_listesi):
-        self.table_genel.setRowCount(len(veri_listesi))
-        for i, row in enumerate(veri_listesi):
-            tc_no = row.get('personel_id', '') 
-            ad_soyad = row.get('Ad_Soyad', '') 
-            self.table_genel.setItem(i, 0, QTableWidgetItem(str(tc_no))) 
-            self.table_genel.setItem(i, 1, QTableWidgetItem(str(ad_soyad))) 
-            self.table_genel.setItem(i, 2, QTableWidgetItem(str(row.get('izin_tipi'))))
-            self.table_genel.setItem(i, 3, QTableWidgetItem(str(row.get('Başlama_Tarihi'))))
-            self.table_genel.setItem(i, 4, QTableWidgetItem(str(row.get('Gun'))))
-            self.table_genel.setItem(i, 5, QTableWidgetItem(str(row.get('Bitiş_Tarihi'))))
-            self.table_genel.item(i, 0).setData(Qt.UserRole, row)
-
-    def _genel_liste_filtrele(self, text):
-        text = text.lower().strip()
-        filtrelenmis = []
-        for row in self.tum_izinler:
-            tc = str(row.get('personel_id', '')).lower()
-            isim = str(row.get('Ad_Soyad', '')).lower()
-            if text in tc or text in isim:
-                filtrelenmis.append(row)
-        self._genel_tabloyu_doldur(filtrelenmis)
-
-    def _satir_secildi(self, row, col):
-        item = self.table_genel.item(row, 0)
-        data = item.data(Qt.UserRole)
-        self.duzenleme_modu = True
-        self.btn_kaydet.setText("GÜNCELLE")
-        # Güncelleme butonu için spesifik renk belirtimi (UI state değişimi olduğu için korunabilir)
-        self.btn_kaydet.setStyleSheet("background-color: #f0ad4e; color: white; font-weight: bold;")
+        # Durumu kontrol et
+        item_durum = self.table.item(row, 5)
+        durum = item_durum.text() if item_durum else ""
         
-        self.txt_id.setText(str(data.get('Id')))
-        self.ui['sinif'].setCurrentText(str(data.get('Hizmet_Sinifi')))
-        tc_hedef = str(data.get('personel_id')) 
-        idx = self.ui['personel'].findData(tc_hedef)
-        if idx >= 0:
-            self.ui['personel'].setCurrentIndex(idx)
+        menu = QMenu()
+        
+        if durum != "İptal Edildi":
+            act_iptal = QAction("🚫 İzni İptal Et", self)
+            act_iptal.triggered.connect(lambda: self._iptal_et(row))
+            menu.addAction(act_iptal)
         else:
-            self.ui['personel'].setCurrentText(str(data.get('Ad_Soyad')))
-        self.ui['izin_tipi'].setCurrentText(str(data.get('izin_tipi')))
-        try:
-            qdate_bas = QDate.fromString(str(data.get('Başlama_Tarihi')), "dd.MM.yyyy")
-            if qdate_bas.isValid(): self.ui['baslama'].setDate(qdate_bas)
-            self.ui['gun'].setValue(int(data.get('Gun', 1)))
-        except: pass
+            act_bilgi = QAction("ℹ️ Bu izin iptal edilmiş.", self)
+            act_bilgi.setEnabled(False)
+            menu.addAction(act_bilgi)
+            
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
-    def _formu_temizle(self):
-        self.duzenleme_modu = False
-        self.btn_kaydet.setText("KAYDET")
-        # Varsayılan duruma dönüş, tema rengi için stil temizlenir
-        self.btn_kaydet.setStyleSheet("") 
-        self.txt_id.clear()
-        self.ui['personel'].setCurrentIndex(0)
-        self.ui['izin_tipi'].setCurrentIndex(0)
-        self.ui['gun'].setValue(1)
-        self.ui['baslama'].setDate(QDate.currentDate())
-        self._genel_tabloyu_doldur(self.tum_izinler)
-        self._bilgi_paneli_sifirla()
+    # 🟢 İPTAL İŞLEMİ
+    def _iptal_et(self, row):
+        if show_question("Onay", "Seçili izin kaydı 'İptal Edildi' olarak işaretlenecek.\nEmin misiniz?", self):
+            kayit_id = self.table.item(row, 0).text() # Gizli ID sütunundan alıyoruz
+            
+            self.progress.setVisible(True)
+            self.i_worker = IzinIptalWorker(kayit_id)
+            self.i_worker.islem_tamam.connect(lambda: (show_info("Başarılı", "İzin iptal edildi.", self), self._verileri_yukle()))
+            self.i_worker.hata_olustu.connect(lambda e: (show_error("Hata", e, self), self.progress.setVisible(False)))
+            self.i_worker.start()
 
-    def _kaydet_baslat(self):
-        if self.ui['personel'].currentText() in ["", "Seçiniz..."]:
-            show_error("Hata", "Lütfen personel seçiniz.", self)
-            return
-        if self.ui['izin_tipi'].currentText() in ["", "Seçiniz...", "Yükleniyor..."]:
-            show_error("Hata", "Lütfen izin tipi seçiniz.", self)
-            return
-
+    def _kaydet(self):
+        if not self.btn_kaydet.isEnabled(): return
         self.btn_kaydet.setEnabled(False)
-        self.progress.setVisible(True); self.progress.setRange(0,0)
+        self.progress.setVisible(True)
         
-        yeni_id = self.txt_id.text() if self.duzenleme_modu else str(uuid.uuid4())[:8]
+        unique_id = int(time.time())
+        gun_sayisi = self.dt_baslama.date().daysTo(self.dt_bitis.date())
         
-        ad_soyad = self.ui['personel'].currentText().strip()
-        tc_kimlik = self.ui['personel'].currentData()
-        if not tc_kimlik:
-            for p in self.tum_personel:
-                if p['ad'] == ad_soyad:
-                    tc_kimlik = p['tc']
-                    break
-        if not tc_kimlik: tc_kimlik = ""
-
-        veri = {
-            'Id': yeni_id,
-            'Hizmet_Sinifi': self.ui['sinif'].currentText(),
-            'personel_id': str(tc_kimlik),
-            'Ad_Soyad': str(ad_soyad),
-            'izin_tipi': self.ui['izin_tipi'].currentText(),
-            'Baslama_Tarihi': self.ui['baslama'].date().toString("dd.MM.yyyy"),
-            'Gun': self.ui['gun'].value(),
-            'Bitis_Tarihi': self.ui['bitis'].date().toString("dd.MM.yyyy")
-        }
-        tip = "guncelle" if self.duzenleme_modu else "yeni"
-        self.k_worker = KayitWorker(veri, tip)
-        self.k_worker.islem_tamam.connect(self._islem_basarili)
-        self.k_worker.hata_olustu.connect(self._hata_goster)
+        veri_listesi = [
+            unique_id,
+            self.hizmet_sinifi,
+            self.tc_no,
+            self.ad_soyad,
+            self.cmb_tur.currentText(),
+            self.dt_baslama.date().toString("dd.MM.yyyy"),
+            gun_sayisi,
+            self.dt_bitis.date().toString("dd.MM.yyyy"),
+            "İşlendi"
+        ]
+        
+        self.k_worker = IzinKayitWorker(veri_listesi)
+        self.k_worker.islem_tamam.connect(self._kayit_basarili)
+        self.k_worker.hata_olustu.connect(self._kayit_hata)
         self.k_worker.start()
 
-    def _islem_basarili(self):
-        self.progress.setVisible(False)
-        self.btn_kaydet.setEnabled(True)
-        show_info("Başarılı", "İşlem başarıyla tamamlandı.", self)
-        self._formu_temizle()
+    def _kayit_basarili(self):
+        show_info("Başarılı", "İzin kaydı başarıyla oluşturuldu.", self)
         self._verileri_yukle()
+        self.btn_kaydet.setEnabled(True)
 
-    def _hata_goster(self, err):
+    def _kayit_hata(self, mesaj):
+        show_error("Hata", f"Kayıt sırasında hata oluştu:\n{mesaj}", self)
         self.progress.setVisible(False)
         self.btn_kaydet.setEnabled(True)
-        show_error("Hata", str(err), self)
-
-    def closeEvent(self, event):
-        worker_names = ['worker', 'k_worker', 'sil_worker']
-        for name in worker_names:
-            if hasattr(self, name):
-                worker = getattr(self, name)
-                if worker and worker.isRunning():
-                    worker.quit()
-                    worker.wait(500)
-        event.accept()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    try:
-        TemaYonetimi.uygula_fusion_dark(app)
-    except Exception as e:
-        print(f"Tema uygulanamadı: {e}")
-    win = IzinGirisPenceresi()
+    app = QApplication([])
+    try: TemaYonetimi.uygula_fusion_dark(app)
+    except: pass
+    win = IzinTakipPenceresi(["11111111111", "Ahmet Yılmaz", "", "", "Teknik Hizmetler"])
     win.show()
-    sys.exit(app.exec())
+    app.exec()

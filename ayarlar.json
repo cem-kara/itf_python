@@ -47,10 +47,7 @@
         }
     },
   "menu_yapilandirma": {
-    "GENEL": [
-      {"baslik": "Dashboard", "modul": "formlar.dashboard", "sinif": "DashboardPenceresi"},
-      {"baslik": "Ayarlar", "modul": "formlar.ayarlar", "sinif": "AyarlarPenceresi"}
-    ],
+    
     "PERSONEL": [
       {"baslik": "Personel Listesi", "modul": "formlar.personel_listesi", "sinif": "PersonelListesiPenceresi"},
       {"baslik": "Personel Ekle", "modul": "formlar.personel_ekle", "sinif": "PersonelEklePenceresi"},
@@ -70,6 +67,10 @@
       {"baslik": "RKE Listesi", "modul": "formlar.rke_yonetim", "sinif": "RKEYonetimPenceresi"},
       {"baslik": "Muayene Girişi", "modul": "formlar.rke_muayene", "sinif": "RKEMuayenePenceresi"},
       {"baslik": "RKE Raporlama", "modul": "formlar.rke_rapor", "sinif": "RKERaporPenceresi"}
+    ],
+    "YÖNETİCİ İŞLEMLERİ": [
+      {"baslik": "Yıl Sonu İzin", "modul": "araclar.yil_sonu_islemleri", "sinif": "YilSonuDevirYoneticisi"},
+      {"baslik": "Ayarlar", "modul": "formlar.ayarlar", "sinif": "AyarlarPenceresi"}
     ]
   }
 }
