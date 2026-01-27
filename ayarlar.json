@@ -51,7 +51,7 @@
     "PERSONEL": [
       {"baslik": "Personel Listesi", "modul": "formlar.personel_listesi", "sinif": "PersonelListesiPenceresi"},
       {"baslik": "Personel Ekle", "modul": "formlar.personel_ekle", "sinif": "PersonelEklePenceresi"},
-      {"baslik": "İzin Takip", "modul": "formlar.izin_takip", "sinif": "IzinGirisPenceresi"},
+      {"baslik": "İzin Takip", "modul": "formlar.izin_takip_list", "sinif": "IzinGirisPenceresi"},
       {"baslik": "FHSZ Yönetim", "modul": "formlar.fhsz_Yonetim", "sinif": "FHSZYonetimPaneli"},
       {"baslik": "Personel Verileri", "modul": "formlar.user_dashboard", "sinif": "DashboardWidget"}
     ],

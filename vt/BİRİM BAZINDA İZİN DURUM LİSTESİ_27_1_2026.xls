@@ -1,0 +1,2054 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test</title><meta http-equiv="Content-Type" content="text/html; charset=windows-1254" /></head><body>
+        <div class="reportHeader">
+            <div class="headerTemplete" style="display: none;">
+                <div class="row1">
+                    <h3 class="ng-binding">İSTANBUL ÜNİVERSİTESİ</h3>
+                </div>
+                <div class="row2">
+                    <h3>Birim Bazında İzin Durum Listesi</h3>
+                </div>
+            </div>
+        <table class="headerTable"><tbody><tr><td><img class="serverSrcItem" style="width:115px; background-color: white; " src="https://pbys.istanbul.edu.tr/Content/report/images/iu.png"></td><td style="vertical-align:middle; text-align:center;">
+                    <h3 class="ng-binding">İSTANBUL ÜNİVERSİTESİ</h3>
+                
+                    <h3>Birim Bazında İzin Durum Listesi</h3>
+                </td><td style="width:160px;"><img class="serverSrcItem" src="https://pbys.istanbul.edu.tr/Content/report/images/iu-kapi.png"></td></tr></tbody></table></div>
+        <br>
+        <br>
+        <span style="font-weight:700" class="ng-binding">Birim : Radyoloji Anabilim Dalı</span><br>
+        <table border="1" style="width: 100%; font-size: 11px;">
+            <thead style="text-align:center;font-weight:700">
+                <tr>
+                    <td rowspan="2" class="center" style="width: 35px;">No</td>
+                    <td style="width:80px;" rowspan="2">Kimlik No</td>
+                    <td style="width:200px;" rowspan="2">Ad Soyad</td>
+                    <td style="width:150px;" rowspan="2">Personel Türü</td>
+                    <td style="width:300px;" rowspan="2">Kadro Unvanı</td>
+                    <td colspan="5">İzin Bilgisi</td>
+                </tr>
+                <tr class="center">
+                    <td style="width:30px;">Hak Edilen</td>
+                    <td style="width:30px;">Devir</td>
+                    <td style="width:30px;">Toplam</td>
+                    <td style="width:30px;">Kullanılan</td>
+                    <td style="width:30px;">Kalan</td>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">30616959560</td>
+                    <td class="ng-binding">ABDULLAH ONUR KILIÇ</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">2</td>
+                    <td class="center ng-binding">18199300764</td>
+                    <td class="ng-binding">ABDURRAHMAN AVCIOĞLU</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">3</td>
+                    <td class="center ng-binding">27274354172</td>
+                    <td class="ng-binding">ABİDİN ÖNDER DÖNMEZ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">4</td>
+                    <td class="center ng-binding">18632783390</td>
+                    <td class="ng-binding">AHMET BAYRAK</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">37</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">37</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">19645682168</td>
+                    <td class="ng-binding">AHMET YILMAZ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">LABORANT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">6</td>
+                    <td class="center ng-binding">22028017990</td>
+                    <td class="ng-binding">ALPEREN KANTARCILAR</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HASTABAKICI</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">33</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">30872319092</td>
+                    <td class="ng-binding">ARİFE TANRIVERDİ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">BİLGİSAYAR İŞLETMENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">8</td>
+                    <td class="center ng-binding">31621815018</td>
+                    <td class="ng-binding">ARTÜR SALMASLIOĞLU</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">9</td>
+                    <td class="center ng-binding">25364482644</td>
+                    <td class="ng-binding">ARZU ÇELİK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding">53</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">53</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">41281522522</td>
+                    <td class="ng-binding">ARZU POYANLI</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">21521659898</td>
+                    <td class="ng-binding">ARZU ŞAHİN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">21521169366</td>
+                    <td class="ng-binding">ARZU BURCU YILMAZ</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">42</td>
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">31</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">38554317466</td>
+                    <td class="ng-binding">ATADAN TUNACI</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding">52</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">47</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">43009257976</td>
+                    <td class="ng-binding">AYHAN AÇAR</td>
+                    <td class="ng-binding">SÖZLEŞMELİ PERSONEL</td>
+                    <td class="ng-binding">BÜRO PERSONELİ (SÖZLEŞMELİ)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">9</td>
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">29</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">67864076688</td>
+                    <td class="ng-binding">AYHAN ARSLANOĞLU</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">16</td>
+                    <td class="center ng-binding">37537744404</td>
+                    <td class="ng-binding">AYHAN ÇATKIN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HASTABAKICI</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding">51</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">51</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">17</td>
+                    <td class="center ng-binding">99249933514</td>
+                    <td class="ng-binding">AYSHAN SAFARALIYEVA</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">UZMANLIK ÖĞRENCİSİ DOKTOR</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">18</td>
+                    <td class="center ng-binding">37745020840</td>
+                    <td class="ng-binding">AYŞİN GÜL</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">47245166252</td>
+                    <td class="ng-binding">BANU İŞCAN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">3</td>
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">33</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">21661184694</td>
+                    <td class="ng-binding">BANU SOLAK</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding">16105981854</td>
+                    <td class="ng-binding">BARIŞ BAKIR</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding">37855404714</td>
+                    <td class="ng-binding">BELİS TOZLU YÜCEL</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">27</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding">42415993164</td>
+                    <td class="ng-binding">BERFİM GÜNGÖRDÜ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">EBE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">24</td>
+                    <td class="center ng-binding">20485675074</td>
+                    <td class="ng-binding">BERNA TOMAÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">18163287602</td>
+                    <td class="ng-binding">BİLAL KARAVİL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">39</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">26</td>
+                    <td class="center ng-binding">40423668340</td>
+                    <td class="ng-binding">BİLGİN COŞKUN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">BİLGİSAYAR İŞLETMENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">41</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding">14522068356</td>
+                    <td class="ng-binding">BİRSEN GENÇA</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">LABORANT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">6</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">36</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">28</td>
+                    <td class="center ng-binding">13352305068</td>
+                    <td class="ng-binding">BURAK ŞAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">35</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">35</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding">51394625768</td>
+                    <td class="ng-binding">BURCU GÜNAY</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">41</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">41</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">13117894240</td>
+                    <td class="ng-binding">CANER VAROL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding">4</td>
+                    <td class="center ng-binding">35</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">31</td>
+                    <td class="center ng-binding">24359170214</td>
+                    <td class="ng-binding">CELAL CANER ERCAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">UZMAN TABİB</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding">57</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">57</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">32</td>
+                    <td class="center ng-binding">20707846060</td>
+                    <td class="ng-binding">CEMİL OĞUZCAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding">59</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">59</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding">30679636910</td>
+                    <td class="ng-binding">CÜNEYT HEBİP</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">34</td>
+                    <td class="center ng-binding">21871342648</td>
+                    <td class="ng-binding">ÇAĞLAR BÜYÜK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding">51</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">51</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">35</td>
+                    <td class="center ng-binding">33955916348</td>
+                    <td class="ng-binding">ÇİĞDEM EREN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding">49576468920</td>
+                    <td class="ng-binding">DEĞER ÖZCAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">6</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">36</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">37</td>
+                    <td class="center ng-binding">59701516396</td>
+                    <td class="ng-binding">DENİZ ASLAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding">52</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">47</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">38</td>
+                    <td class="center ng-binding">33946154308</td>
+                    <td class="ng-binding">DENİZ SALİHA SOBAYAPAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">33</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding">28762644492</td>
+                    <td class="ng-binding">DİLEK BUZAKOĞLU</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding">12569465558</td>
+                    <td class="ng-binding">DİLEK İPKİR</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">ŞEF</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding">52</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">52</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">41</td>
+                    <td class="center ng-binding">19370884370</td>
+                    <td class="ng-binding">DİLŞAH SALKIN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">42</td>
+                    <td class="center ng-binding">44974017398</td>
+                    <td class="ng-binding">EBRU ARSLAN BAHÇEKAPILI</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">43</td>
+                    <td class="center ng-binding">34937208444</td>
+                    <td class="ng-binding">EDA EVCİL</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">28</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">33</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">44</td>
+                    <td class="center ng-binding">27259973206</td>
+                    <td class="ng-binding">EKREM ÇOK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">4</td>
+                    <td class="center ng-binding">24</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">24</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">45</td>
+                    <td class="center ng-binding">29935811918</td>
+                    <td class="ng-binding">ELİF ERDEN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">17</td>
+                    <td class="center ng-binding">47</td>
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">36</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">46</td>
+                    <td class="center ng-binding">12247655530</td>
+                    <td class="ng-binding">ELİF ŞENTÜRK TORAMAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">6</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">36</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">47</td>
+                    <td class="center ng-binding">37843810688</td>
+                    <td class="ng-binding">ELİF NUR KOÇAK</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">16</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">35</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">48</td>
+                    <td class="center ng-binding">63796380978</td>
+                    <td class="ng-binding">EMEL BAŞ</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">49</td>
+                    <td class="center ng-binding">31388172744</td>
+                    <td class="ng-binding">EMİNE İNAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">16</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">36</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding">46087437582</td>
+                    <td class="ng-binding">EMİRHAN KARAŞ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">3</td>
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">23</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">51</td>
+                    <td class="center ng-binding">31531851298</td>
+                    <td class="ng-binding">EMRE TOLGA ŞAHİN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">52</td>
+                    <td class="center ng-binding">20564739512</td>
+                    <td class="ng-binding">ERCAN HAMARAT</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">53</td>
+                    <td class="center ng-binding">19136259152</td>
+                    <td class="ng-binding">FAİK ALKAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">54</td>
+                    <td class="center ng-binding">99402629056</td>
+                    <td class="ng-binding">FARZAD FARAHMAND</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">UZMANLIK ÖĞRENCİSİ DOKTOR</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">27</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding">24613311988</td>
+                    <td class="ng-binding">FATİH IŞIK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">56</td>
+                    <td class="center ng-binding">45238830586</td>
+                    <td class="ng-binding">FATİH SELAMET TARTICI</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">57</td>
+                    <td class="center ng-binding">22460522250</td>
+                    <td class="ng-binding">FATMA BİRSU TEPECİK</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">58</td>
+                    <td class="center ng-binding">54415383272</td>
+                    <td class="ng-binding">FEVZİ KARAHAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">48</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">59</td>
+                    <td class="center ng-binding">22841362222</td>
+                    <td class="ng-binding">FİDAN KOCA</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">41</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">41</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">99582273230</td>
+                    <td class="ng-binding">FUAD ALIYEV</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">UZMANLIK ÖĞRENCİSİ DOKTOR</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">61</td>
+                    <td class="center ng-binding">20848880862</td>
+                    <td class="ng-binding">FURKAN IŞIK</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ</td>
+                    <td class="ng-binding">HASTANE HİZMETLİSİ (İŞÇİ)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">62</td>
+                    <td class="center ng-binding">53749733876</td>
+                    <td class="ng-binding">FURKAN POLAT</td>
+                    <td class="ng-binding">SÖZLEŞMELİ PERSONEL</td>
+                    <td class="ng-binding">DESTEK PERSONELİ -HASTA BAKIMI(SÖZLEŞMELİ)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">22</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">63</td>
+                    <td class="center ng-binding">12613512146</td>
+                    <td class="ng-binding">GÖNÜL PEREK</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">64</td>
+                    <td class="center ng-binding">14408761326</td>
+                    <td class="ng-binding">GURBET KARACAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">65</td>
+                    <td class="center ng-binding">23204627972</td>
+                    <td class="ng-binding">GÜLŞEN ERDEM</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">37</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">37</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">66</td>
+                    <td class="center ng-binding">54907073476</td>
+                    <td class="ng-binding">GÜLŞEN YÜCE</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">BİLGİSAYAR İŞLETMENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">17</td>
+                    <td class="center ng-binding">47</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">47</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">67</td>
+                    <td class="center ng-binding">23609090784</td>
+                    <td class="ng-binding">HAKAN DURMUŞ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">FİZİKÇİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">68</td>
+                    <td class="center ng-binding">10904460510</td>
+                    <td class="ng-binding">HAKAN ERAVCI</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">18</td>
+                    <td class="center ng-binding">38</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">38</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">69</td>
+                    <td class="center ng-binding">39511597594</td>
+                    <td class="ng-binding">HAKKI TUNCER</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">11</td>
+                    <td class="center ng-binding">41</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">41</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">70</td>
+                    <td class="center ng-binding">13157251218</td>
+                    <td class="ng-binding">HAMZA KURT</td>
+                    <td class="ng-binding">SÖZLEŞMELİ PERSONEL</td>
+                    <td class="ng-binding">DESTEK PERSONELİ-(SÖZLEŞMELİ)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">71</td>
+                    <td class="center ng-binding">19093830272</td>
+                    <td class="ng-binding">HASAN TAŞ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">39</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">72</td>
+                    <td class="center ng-binding">21031245840</td>
+                    <td class="ng-binding">HATİCE ÜNAL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">73</td>
+                    <td class="center ng-binding">58003101996</td>
+                    <td class="ng-binding">HELİN KÖSE</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">8</td>
+                    <td class="center ng-binding">28</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">28</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">74</td>
+                    <td class="center ng-binding">11369524472</td>
+                    <td class="ng-binding">HİKMET ARIKAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">43</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">43</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">75</td>
+                    <td class="center ng-binding">48832538292</td>
+                    <td class="ng-binding">HİLAL ERVA ACAR</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">76</td>
+                    <td class="center ng-binding">11113132182</td>
+                    <td class="ng-binding">HİLMİ DEMİRCİ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">77</td>
+                    <td class="center ng-binding">31508322790</td>
+                    <td class="ng-binding">HİLMİ KORKMAZ</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ</td>
+                    <td class="ng-binding">VASIFSIZ İŞÇİ (İŞÇİ)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">78</td>
+                    <td class="center ng-binding">12056674562</td>
+                    <td class="ng-binding">HÜMEYRA SIVACI</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">45</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">45</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">79</td>
+                    <td class="center ng-binding">48916868796</td>
+                    <td class="ng-binding">HÜSEYİN HARUN KADIRHAN</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">80</td>
+                    <td class="center ng-binding">24637635220</td>
+                    <td class="ng-binding">İBRAHİM HALİL AKKIŞ</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">81</td>
+                    <td class="center ng-binding">29821659372</td>
+                    <td class="ng-binding">İLKAY KARSAVRAN ÖZTÜRK</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">9</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding">9</td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">82</td>
+                    <td class="center ng-binding">15095653802</td>
+                    <td class="ng-binding">İLKNUR AKGÜNLÜ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">24</td>
+                    <td class="center ng-binding">54</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">49</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">83</td>
+                    <td class="center ng-binding">12983078648</td>
+                    <td class="ng-binding">İNCİ UZALA MORAN</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">84</td>
+                    <td class="center ng-binding">28712582386</td>
+                    <td class="ng-binding">İSA DURAK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">85</td>
+                    <td class="center ng-binding">11828330422</td>
+                    <td class="ng-binding">İSMAİL SARIGÜZEL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">LABORANT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">45</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">86</td>
+                    <td class="center ng-binding">47773688998</td>
+                    <td class="ng-binding">KADİR KAHYAROĞLU</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ</td>
+                    <td class="ng-binding">HASTANE HİZMETLİSİ (İŞÇİ)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">3</td>
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">23</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">87</td>
+                    <td class="center ng-binding">15311539446</td>
+                    <td class="ng-binding">KADRİYE KARACA</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding">53</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">41</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">88</td>
+                    <td class="center ng-binding">22121568030</td>
+                    <td class="ng-binding">KADRİYE YILMAZ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">26</td>
+                    <td class="center ng-binding">56</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">56</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">89</td>
+                    <td class="center ng-binding">40522140952</td>
+                    <td class="ng-binding">KEMAL ALTAY</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">90</td>
+                    <td class="center ng-binding">10284016888</td>
+                    <td class="ng-binding">KÜBRA GÜLTAŞ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">91</td>
+                    <td class="center ng-binding">52225546382</td>
+                    <td class="ng-binding">KÜBRANUR DUMAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">21</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">92</td>
+                    <td class="center ng-binding">11387331502</td>
+                    <td class="ng-binding">MEHMET BARBUROĞLU</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">DOÇENT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">23</td>
+                    <td class="center ng-binding">53</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">48</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">93</td>
+                    <td class="center ng-binding">19640207694</td>
+                    <td class="ng-binding">MEHMET KÜSKÜ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">94</td>
+                    <td class="center ng-binding">16019689662</td>
+                    <td class="ng-binding">MEHMET NUR ÖNDER</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">95</td>
+                    <td class="center ng-binding">50233001510</td>
+                    <td class="ng-binding">MEHMET SEMİH ÇAKIR</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">DOKTOR ÖĞRETİM ÜYESİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">96</td>
+                    <td class="center ng-binding">14993965512</td>
+                    <td class="ng-binding">MELEK ULU</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding">59</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">59</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">97</td>
+                    <td class="center ng-binding">19091230050</td>
+                    <td class="ng-binding">MELEK ÜNAL ÖNEŞ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">16</td>
+                    <td class="center ng-binding">46</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">46</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">98</td>
+                    <td class="center ng-binding">37921103466</td>
+                    <td class="ng-binding">MELİHA SULTAN ÖZENÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">99</td>
+                    <td class="center ng-binding">33535764826</td>
+                    <td class="ng-binding">MELİS KAYA</td>
+                    <td class="ng-binding">SÖZLEŞMELİ PERSONEL</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ (SÖZLEŞMELİ)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">100</td>
+                    <td class="center ng-binding">30721987816</td>
+                    <td class="ng-binding">MENDUH DURSUN</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">101</td>
+                    <td class="center ng-binding">24464088152</td>
+                    <td class="ng-binding">MERT ÖZVATAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">102</td>
+                    <td class="center ng-binding">13748460722</td>
+                    <td class="ng-binding">MERVE GÜLBİZ DAĞOĞLU KARTAL</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">2</td>
+                    <td class="center ng-binding">58</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">103</td>
+                    <td class="center ng-binding">71848153692</td>
+                    <td class="ng-binding">MERYEM BAYRAM</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">26</td>
+                    <td class="center ng-binding">56</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">51</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">104</td>
+                    <td class="center ng-binding">21287593344</td>
+                    <td class="ng-binding">MERYEM KILIÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding">59</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">59</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">105</td>
+                    <td class="center ng-binding">60238234356</td>
+                    <td class="ng-binding">MESUT BULAKÇI</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">106</td>
+                    <td class="center ng-binding">48055109934</td>
+                    <td class="ng-binding">MESUT ÖZBEK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">39</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">107</td>
+                    <td class="center ng-binding">98896058014</td>
+                    <td class="ng-binding">MIKAEIL AHMADPOURDASHLIBOROUN</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">108</td>
+                    <td class="center ng-binding">20194846734</td>
+                    <td class="ng-binding">MİRAY İVAK</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">109</td>
+                    <td class="center ng-binding">46462362676</td>
+                    <td class="ng-binding">MUHAMMET TONKAL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">110</td>
+                    <td class="center ng-binding">60871104344</td>
+                    <td class="ng-binding">MURAT TÜRKER</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">34</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">34</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">111</td>
+                    <td class="center ng-binding">11437413172</td>
+                    <td class="ng-binding">MURAT YILMAZ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">17</td>
+                    <td class="center ng-binding">47</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">47</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">112</td>
+                    <td class="center ng-binding">50575679194</td>
+                    <td class="ng-binding">MUSTAFA DURMAZ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">18</td>
+                    <td class="center ng-binding">38</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">38</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">113</td>
+                    <td class="center ng-binding">49576376782</td>
+                    <td class="ng-binding">MUSTAFA ÖZEN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">114</td>
+                    <td class="center ng-binding">13166820894</td>
+                    <td class="ng-binding">MÜNEVVER EBRU TANGİ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding">52</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">52</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">115</td>
+                    <td class="center ng-binding">11993631676</td>
+                    <td class="ng-binding">NACİYE PEHLİVANOĞLU ALUÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">45</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">116</td>
+                    <td class="center ng-binding">57901446680</td>
+                    <td class="ng-binding">NARGÜL ŞAHİN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">29</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">117</td>
+                    <td class="center ng-binding">25300814430</td>
+                    <td class="ng-binding">NAZLI HİLAL YANIK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">33</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">28</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">118</td>
+                    <td class="center ng-binding">35317469424</td>
+                    <td class="ng-binding">NEBİLE MEDETALİBEYOĞLU</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">21</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">119</td>
+                    <td class="center ng-binding">44626390992</td>
+                    <td class="ng-binding">NEBİYE SERRA SENCER</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">120</td>
+                    <td class="center ng-binding">25333965444</td>
+                    <td class="ng-binding">NESRİN BİNAY</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">121</td>
+                    <td class="center ng-binding">24547704474</td>
+                    <td class="ng-binding">NİDA KARACA</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">44</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">34</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">122</td>
+                    <td class="center ng-binding">48076259472</td>
+                    <td class="ng-binding">NURCAN UZEL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">BİLGİSAYAR İŞLETMENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">18</td>
+                    <td class="center ng-binding">48</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">48</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">123</td>
+                    <td class="center ng-binding">11012515512</td>
+                    <td class="ng-binding">OĞUL ADNAN RECAL</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">124</td>
+                    <td class="center ng-binding">43702132068</td>
+                    <td class="ng-binding">ÖMER DEMİR</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">45</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">45</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">125</td>
+                    <td class="center ng-binding">47110171046</td>
+                    <td class="ng-binding">ÖYKÜ İKİZGÜL</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">39</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">39</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">126</td>
+                    <td class="center ng-binding">58648338870</td>
+                    <td class="ng-binding">ÖZGE DENİZ FAZLIOĞLU</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">127</td>
+                    <td class="center ng-binding">31021518472</td>
+                    <td class="ng-binding">ÖZLEM DEMİRBÜKEN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">128</td>
+                    <td class="center ng-binding">17512109152</td>
+                    <td class="ng-binding">ÖZLEM BURUC KUŞ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">2</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">22</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">129</td>
+                    <td class="center ng-binding">55153668942</td>
+                    <td class="ng-binding">PINAR ŞİMŞEK</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">130</td>
+                    <td class="center ng-binding">11086810612</td>
+                    <td class="ng-binding">RAMAZAN NAZLIM</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">131</td>
+                    <td class="center ng-binding">32507226546</td>
+                    <td class="ng-binding">RANA GÜNÖZ CÖMERT BOZKURT</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">DOKTOR ÖĞRETİM ÜYESİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">132</td>
+                    <td class="center ng-binding">48949606938</td>
+                    <td class="ng-binding">RAVZA SÜMEYYE YILMAZ</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">DOÇENT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">133</td>
+                    <td class="center ng-binding">10360622910</td>
+                    <td class="ng-binding">RESUL USUL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">LABORANT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">134</td>
+                    <td class="center ng-binding">49456246976</td>
+                    <td class="ng-binding">REŞAT ERDEN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HİZMETLİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">135</td>
+                    <td class="center ng-binding">21643799168</td>
+                    <td class="ng-binding">RÜMEYSA GÜÇLÜ</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">2</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">22</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">136</td>
+                    <td class="center ng-binding">60316051776</td>
+                    <td class="ng-binding">RÜMEYSA ŞEVİK</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">137</td>
+                    <td class="center ng-binding">32042074596</td>
+                    <td class="ng-binding">SADIK ÖZLEM</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">138</td>
+                    <td class="center ng-binding">99961505396</td>
+                    <td class="ng-binding">SAHIB ALIZADA</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">UZMANLIK ÖĞRENCİSİ DOKTOR</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">139</td>
+                    <td class="center ng-binding">16889511896</td>
+                    <td class="ng-binding">SAİT KAYALI</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">2</td>
+                    <td class="center ng-binding">22</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">22</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">140</td>
+                    <td class="center ng-binding">14453946860</td>
+                    <td class="ng-binding">SALİH YILDIRIM</td>
+                    <td class="ng-binding">KURUM DIŞI PERSONEL (İDARİ)</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">15</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">141</td>
+                    <td class="center ng-binding">38447209366</td>
+                    <td class="ng-binding">SEDAT ÖNEL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">142</td>
+                    <td class="center ng-binding">42517767694</td>
+                    <td class="ng-binding">SELİN DAL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK MEMURU</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">8</td>
+                    <td class="center ng-binding">28</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">28</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">143</td>
+                    <td class="center ng-binding">21554483798</td>
+                    <td class="ng-binding">SERAP ALPTEKİN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">49</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">44</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">144</td>
+                    <td class="center ng-binding">58747256396</td>
+                    <td class="ng-binding">SERKAN HACIMUSTAFAOĞLU</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">145</td>
+                    <td class="center ng-binding">52249634904</td>
+                    <td class="ng-binding">SEVİLAY TUNCAY</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">4</td>
+                    <td class="center ng-binding">29</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">24</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">146</td>
+                    <td class="center ng-binding">24472169522</td>
+                    <td class="ng-binding">SEYHAN KOÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">TEKNİSYEN</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">147</td>
+                    <td class="center ng-binding">98638061876</td>
+                    <td class="ng-binding">SHABNAM MOSTAFAZADEH</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">148</td>
+                    <td class="center ng-binding">23144260260</td>
+                    <td class="ng-binding">SILA ATACAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">32</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">32</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">149</td>
+                    <td class="center ng-binding">45535056238</td>
+                    <td class="ng-binding">SITKI SAFA TAFLAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">150</td>
+                    <td class="center ng-binding">12251383320</td>
+                    <td class="ng-binding">SİMAY SARA NAS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">151</td>
+                    <td class="center ng-binding">56374246872</td>
+                    <td class="ng-binding">SİNAN SEYREK</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">152</td>
+                    <td class="center ng-binding">28934082220</td>
+                    <td class="ng-binding">SÜMEYYE ÇARPIŞAN</td>
+                    <td class="ng-binding">SÖZLEŞMELİ PERSONEL</td>
+                    <td class="ng-binding">DESTEK PERSONELİ -HASTA BAKIMI(SÖZLEŞMELİ)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">153</td>
+                    <td class="center ng-binding">17204803498</td>
+                    <td class="ng-binding">ŞABAN ŞAHİN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">28</td>
+                    <td class="center ng-binding">8</td>
+                    <td class="center ng-binding">36</td>
+                    <td class="center ng-binding">8</td>
+                    <td class="center ng-binding">28</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">154</td>
+                    <td class="center ng-binding">10298421838</td>
+                    <td class="ng-binding">ŞEVVAL DEMİR</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">155</td>
+                    <td class="center ng-binding">28433119304</td>
+                    <td class="ng-binding">ŞUHEDA ŞENGÜL</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">156</td>
+                    <td class="center ng-binding">16118591866</td>
+                    <td class="ng-binding">ŞÜKRÜ MEHMET ERTÜRK</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">PROFESÖR</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">10</td>
+                    <td class="center ng-binding">50</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">157</td>
+                    <td class="center ng-binding">13887042902</td>
+                    <td class="ng-binding">ŞÜKRÜ SARP ŞAHİN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">-12</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">158</td>
+                    <td class="center ng-binding">13865278156</td>
+                    <td class="ng-binding">ŞÜKRÜYE YALIN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">159</td>
+                    <td class="center ng-binding">34882949300</td>
+                    <td class="ng-binding">TAYLAN GÖĞER</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">160</td>
+                    <td class="center ng-binding">41704030504</td>
+                    <td class="ng-binding">TUĞBA BAĞLAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">161</td>
+                    <td class="center ng-binding">28904183094</td>
+                    <td class="ng-binding">TUĞÇE ÇALIKOĞLU ESKİ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">162</td>
+                    <td class="center ng-binding">41548953762</td>
+                    <td class="ng-binding">TUĞKAN ERGÜN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">163</td>
+                    <td class="center ng-binding">43342852876</td>
+                    <td class="ng-binding">UFUK AYDOĞAN</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding">57</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">57</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">164</td>
+                    <td class="center ng-binding">63370399358</td>
+                    <td class="ng-binding">UMUT KÖMÜRCÜ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">50</td>
+                    <td class="center ng-binding">13</td>
+                    <td class="center ng-binding">37</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">165</td>
+                    <td class="center ng-binding">62629279496</td>
+                    <td class="ng-binding">VEDAT BURAK KANDEMİRLİ</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">34</td>
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">166</td>
+                    <td class="center ng-binding">51853650362</td>
+                    <td class="ng-binding">VEHBİ GENÇ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HASTABAKICI</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">49</td>
+                    <td class="center ng-binding">19</td>
+                    <td class="center ng-binding">30</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">167</td>
+                    <td class="center ng-binding">18236406640</td>
+                    <td class="ng-binding">YAĞMUR TATAR</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">40</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">168</td>
+                    <td class="center ng-binding">21413501298</td>
+                    <td class="ng-binding">YASA ALP</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding">12</td>
+                    <td class="center ng-binding">48</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">169</td>
+                    <td class="center ng-binding">24103868596</td>
+                    <td class="ng-binding">YASEMİN GÜNÜŞEN</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">9</td>
+                    <td class="center ng-binding">34</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">34</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">170</td>
+                    <td class="center ng-binding">24278072620</td>
+                    <td class="ng-binding">YASEMİN MOZAKOĞLU SEMENDER</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">BİLGİSAYAR İŞLETMENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding">55</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">55</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">171</td>
+                    <td class="center ng-binding">12649440932</td>
+                    <td class="ng-binding">YAVUZ BAHADIR TAKTAK</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- TUS</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">5</td>
+                    <td class="center ng-binding">25</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">25</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">172</td>
+                    <td class="center ng-binding">99210522976</td>
+                    <td class="ng-binding">YEGANA MAMMADOVA</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ- YBTUS</td>
+                    <td class="ng-binding">UZMANLIK ÖĞRENCİSİ DOKTOR</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">20</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">173</td>
+                    <td class="center ng-binding">21158107410</td>
+                    <td class="ng-binding">YEKTA KESİM</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">174</td>
+                    <td class="center ng-binding">53122605868</td>
+                    <td class="ng-binding">YILDIZ GEDİK</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">15</td>
+                    <td class="center ng-binding">45</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">45</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">175</td>
+                    <td class="center ng-binding">45274456344</td>
+                    <td class="ng-binding">YUNUS EMRE NORÇİNLİ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">27</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">27</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">176</td>
+                    <td class="center ng-binding">59974019778</td>
+                    <td class="ng-binding">YUSUF KAHRAMAN</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding">0</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">0</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">177</td>
+                    <td class="center ng-binding">50599306298</td>
+                    <td class="ng-binding">YUSUF TATLISÖZ</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">TEKNİSYEN YARDIMCISI</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">178</td>
+                    <td class="center ng-binding">59485493838</td>
+                    <td class="ng-binding">ZERRİN BOZKURT</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİSYENİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">7</td>
+                    <td class="center ng-binding">37</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">37</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">179</td>
+                    <td class="center ng-binding">19052329618</td>
+                    <td class="ng-binding">ZEYNEP ÇOBANOĞLU</td>
+                    <td class="ng-binding">SÜREKLİ İŞÇİ (Ş)</td>
+                    <td class="ng-binding">DİĞER PERSONEL (Ş)</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">1</td>
+                    <td class="center ng-binding">31</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">31</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">180</td>
+                    <td class="center ng-binding">15266714844</td>
+                    <td class="ng-binding">ZEYNEP KANDEMİRLİ</td>
+                    <td class="ng-binding">SAĞLIK BAKANLIĞI PERSONELİ</td>
+                    <td class="ng-binding">ARAŞTIRMA GÖREVLİSİ (KURUM DIŞI)</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">20</td>
+                    <td class="center ng-binding">40</td>
+                    <td class="center ng-binding">14</td>
+                    <td class="center ng-binding">26</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">181</td>
+                    <td class="center ng-binding">27652939496</td>
+                    <td class="ng-binding">ZEYNEP ÖZTÜRK</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">HEMŞİRE</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">21</td>
+                    <td class="center ng-binding">51</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">51</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">182</td>
+                    <td class="center ng-binding">39292722758</td>
+                    <td class="ng-binding">ZUHAL BAYRAMOĞLU</td>
+                    <td class="ng-binding">AKADEMİK</td>
+                    <td class="ng-binding">DOÇENT</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">16</td>
+                    <td class="center ng-binding">46</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">46</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater --><tr ng-repeat="d in data.izinDurumRepeater" class="ng-scope">
+                    <td class="center ng-binding">183</td>
+                    <td class="center ng-binding">15848154310</td>
+                    <td class="ng-binding">ZÜLEYHA ZORLU</td>
+                    <td class="ng-binding">657 TABİİ</td>
+                    <td class="ng-binding">SAĞLIK TEKNİKERİ</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">30</td>
+                    <td class="center ng-binding">60</td>
+                    <td class="center ng-binding"></td>
+                    <td class="center ng-binding">60</td>
+                </tr><!-- end ngRepeat: d in data.izinDurumRepeater -->
+            </tbody>
+        </table>
+    </body></html>

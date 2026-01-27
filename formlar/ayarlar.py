@@ -220,7 +220,7 @@ class AyarlarPenceresi(QWidget):
         v_islem.addWidget(self.cmb_islem); h_yetki.addLayout(v_islem)
 
         # Buton
-        self.btn_yetki_ekle = QPushButton("KURAL EKLE")
+        self.btn_yetki_ekle = QPushButton("KURAL")
         self.btn_yetki_ekle.setFixedSize(100, 40)
         self.btn_yetki_ekle.setStyleSheet("background-color: #d13438; color: white; font-weight: bold; border-radius: 4px;")
         self.btn_yetki_ekle.clicked.connect(self.yetki_ekle)
@@ -299,7 +299,7 @@ class AyarlarPenceresi(QWidget):
         self.table_tatil.setRowCount(len(filt))
         for i, r in enumerate(filt):
             self.table_tatil.setItem(i, 0, QTableWidgetItem(str(r.get('Tarih',''))))
-            self.table_tatil.setItem(i, 1, QTableWidgetItem(str(r.get('Aciklama', r.get('Tatil Adi','')))))
+            self.table_tatil.setItem(i, 1, QTableWidgetItem(str(r.get('Resmi_Tatil', r.get('Tatil Adi','')))))
 
     def tatil_ekle(self):
         t = self.date_tatil.date().toString("dd.MM.yyyy"); a = self.txt_tatil_aciklama.text().strip()
