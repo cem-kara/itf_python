@@ -26,11 +26,9 @@ if root_dir not in sys.path:
 try:
     from araclar.yetki_yonetimi import YetkiYoneticisi
     from temalar.tema import TemaYonetimi
-    
     from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi
     from araclar.ortak_araclar import OrtakAraclar, pencereyi_kapat, show_info, show_error, show_question
     from araclar.hesaplamalar import sua_hak_edis_hesapla, tr_upper, is_gunu_hesapla
-    
     from gspread.cell import Cell 
 except ImportError as e:
     print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
@@ -39,7 +37,6 @@ except ImportError as e:
 # =============================================================================
 # DELEGATE SINIFLARI
 # =============================================================================
-
 class ComboDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -130,7 +127,7 @@ class SonucDelegate(QStyledItemDelegate):
         painter.restore()
 
 # =============================================================================
-# WORKER: PUANTAJ KONTROL (MÜKERRER KAYIT) - YENİ EKLENDİ
+# WORKER: PUANTAJ KONTROL (MÜKERRER KAYIT)
 # =============================================================================
 class PuantajKontrolWorker(QThread):
     durum_sinyali = Signal(bool, int) # Var mı (True/False), Kayıt Sayısı
@@ -151,10 +148,12 @@ class PuantajKontrolWorker(QThread):
             all_data = ws.get_all_records()
             count = 0
             for row in all_data:
+                # Kolon isimlerindeki boşlukları temizle
                 row_clean = {k.strip(): v for k, v in row.items()}
-                # Kolon isimleri değişebilir diye esnek kontrol
-                r_yil = str(row_clean.get('Ait_yil', '')).strip()
-                r_ay = str(row_clean.get('1. Dönem', '') or row_clean.get('Donem', '')).strip()
+                
+                # Standart isimleri kontrol et (Eski isimler kalmışsa diye alternatifleri de ekledik)
+                r_yil = str(row_clean.get('Ait_Yil', '') or row_clean.get('Ait_yil', '')).strip()
+                r_ay = str(row_clean.get('Donem', '') or row_clean.get('1. Dönem', '')).strip()
                 
                 if r_yil == self.yil and r_ay == self.ay:
                     count += 1
@@ -165,7 +164,7 @@ class PuantajKontrolWorker(QThread):
             self.hata_olustu.emit(str(e))
 
 # =============================================================================
-# WORKER: TAM KAYIT VE GÜNCELLEME - YENİ EKLENDİ
+# WORKER: TAM KAYIT VE GÜNCELLEME
 # =============================================================================
 class TamKayitWorker(QThread):
     log_sinyali = Signal(str)
@@ -190,20 +189,19 @@ class TamKayitWorker(QThread):
                 self.log_sinyali.emit(f"⚠️ {self.yil} {self.ay} dönemi temizleniyor...")
                 all_rows = ws_puantaj.get_all_values()
                 if len(all_rows) > 1:
-                    headers = all_rows[0]
+                    headers = [str(h).strip() for h in all_rows[0]]
                     data_rows = all_rows[1:]
                     
                     try:
                         idx_yil = -1
                         idx_ay = -1
                         for i, h in enumerate(headers):
-                            h_clean = h.strip().lower()
-                            if 'yil' in h_clean: idx_yil = i
-                            if 'dönem' in h_clean or 'donem' in h_clean: idx_ay = i
+                            if h in ['Ait_Yil', 'Ait_yil']: idx_yil = i
+                            if h in ['Donem', '1. Dönem', 'Dönem']: idx_ay = i
                         
                         if idx_yil != -1 and idx_ay != -1:
-                            # Bu döneme ait OLMAYANLARI filtrele
-                            new_data = [headers] + [r for r in data_rows if not (str(r[idx_yil]) == self.yil and str(r[idx_ay]) == self.ay)]
+                            # Bu döneme ait OLMAYANLARI filtrele (Silme işlemi)
+                            new_data = [all_rows[0]] + [r for r in data_rows if not (str(r[idx_yil]) == self.yil and str(r[idx_ay]) == self.ay)]
                             
                             ws_puantaj.clear()
                             ws_puantaj.update('A1', new_data)
@@ -215,19 +213,22 @@ class TamKayitWorker(QThread):
             ws_puantaj.append_rows(self.veriler)
             
             # --- 3. İZİN BİLGİ GÜNCELLEME (OTOMATİK) ---
-            self.log_sinyali.emit("🔄 Şua hak edişleri hesaplanıp güncelleniyor...")
+            self.log_sinyali.emit("🔄 Şua kazanımları hesaplanıp güncelleniyor...")
             
+            # Güncel puantajı tekrar çek
             all_puantaj = ws_puantaj.get_all_records()
             df = pd.DataFrame(all_puantaj)
             
             if not df.empty:
-                df.columns = df.columns.str.strip()
-                c_yil = next((c for c in df.columns if 'yil' in c.lower()), None)
+                df.columns = [c.strip() for c in df.columns]
+                
+                # Kolon adlarını bul
+                c_yil = next((c for c in df.columns if c in ['Ait_Yil', 'Ait_yil']), None)
                 c_saat = next((c for c in df.columns if 'fiili' in c.lower()), None)
-                c_id = next((c for c in df.columns if 'personel_id' in c.lower()), None)
+                c_id = next((c for c in df.columns if 'personel' in c.lower()), None)
                 
                 if c_yil and c_saat and c_id:
-                    # Sadece bu yılın verilerini alıp topla
+                    # Sadece bu yılı filtrele
                     df_bu_yil = df[df[c_yil].astype(str) == self.yil].copy()
                     df_bu_yil['saat_val'] = pd.to_numeric(df_bu_yil[c_saat].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
                     df_bu_yil['clean_id'] = df_bu_yil[c_id].astype(str).str.split('.').str[0].str.strip()
@@ -238,6 +239,7 @@ class TamKayitWorker(QThread):
                     bilgi_rows = ws_izin.get_all_values()
                     headers_bilgi = [str(x).strip() for x in bilgi_rows[0]]
                     
+                    # 🟢 YENİ SÜTUNLAR
                     target_col = "Sua_Cari_Yil_Kazanim" 
                     kimlik_col = "TC_Kimlik"            
                     
@@ -252,7 +254,7 @@ class TamKayitWorker(QThread):
                             
                             if tc in kisi_toplamlari:
                                 yeni_hak = sua_hak_edis_hesapla(kisi_toplamlari[tc])
-                                try: mevcut = float(row[idx_target-1].replace(',', '.'))
+                                try: mevcut = float(str(row[idx_target-1]).replace(',', '.'))
                                 except: mevcut = -1
                                 
                                 if mevcut != yeni_hak:
@@ -260,9 +262,9 @@ class TamKayitWorker(QThread):
                         
                         if updates:
                             ws_izin.update_cells(updates)
-                            self.log_sinyali.emit(f"✅ {len(updates)} personelin şua kazanımı güncellendi.")
+                            self.log_sinyali.emit(f"✅ {len(updates)} personelin cari şua kazanımı güncellendi.")
                     else:
-                        self.log_sinyali.emit("⚠️ Sütun isimleri bulunamadı (TC_Kimlik, Sua_Cari_Yil_Kazanim).")
+                        self.log_sinyali.emit("⚠️ HATA: 'izin_bilgi' tablosunda 'Sua_Cari_Yil_Kazanim' sütunu bulunamadı.")
 
             self.islem_bitti.emit()
 
@@ -296,7 +298,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # --- 1. ÜST PANEL ---
+        # --- ÜST PANEL ---
         filter_frame = QFrame()
         filter_frame.setObjectName("filter_frame") 
         filter_frame.setStyleSheet("""
@@ -340,7 +342,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         
         main_layout.addWidget(filter_frame)
 
-        # --- 2. ORTA PANEL ---
+        # --- ORTA PANEL ---
         self.sutunlar = ["Kimlik No", "Adı Soyadı", "Birim", "Çalışma Koşulu", 
                          "Aylık Gün", "Kullanılan İzin", "Fiili Çalışma (Saat)"]
         
@@ -391,7 +393,7 @@ class FHSZHesaplamaPenceresi(QWidget):
 
         main_layout.addWidget(self.tablo)
         
-        # --- 3. ALT PANEL ---
+        # --- ALT PANEL ---
         footer_layout = QHBoxLayout()
         footer_layout.setContentsMargins(0, 5, 0, 0)
         
@@ -596,7 +598,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         except Exception:
             pass
 
-    # --- YENİ KAYIT SÜRECİ (MÜKERRER KONTROLLÜ) ---
+    # --- KAYIT SÜRECİ (MÜKERRER KONTROLLÜ) ---
     def kaydet_baslat(self):
         if self.tablo.rowCount() == 0: return
         
@@ -639,7 +641,7 @@ class FHSZHesaplamaPenceresi(QWidget):
                 self.tablo.item(r, 6).text()
             ])
             
-        # 2. Tam Kayıt Worker'ı Başlat (Otomatik Güncelleme Dahil)
+        # 2. Tam Kayıt Worker'ı Başlat
         self.t_worker = TamKayitWorker(veriler, self.cmb_yil.currentText(), self.cmb_ay.currentText(), overwrite)
         self.t_worker.log_sinyali.connect(self.lbl_durum.setText)
         self.t_worker.islem_bitti.connect(self._on_kayit_basarili)
@@ -649,7 +651,7 @@ class FHSZHesaplamaPenceresi(QWidget):
     def _on_kayit_basarili(self):
         self.btn_kaydet.setEnabled(True)
         self.progress.setVisible(False)
-        show_info("Başarılı", "Puantaj kaydedildi ve şua kazanımları güncellendi.", self)
+        show_info("Başarılı", "Puantaj kaydedildi ve cari şua kazanımları güncellendi.", self)
         self.lbl_durum.setText("Hazır")
 
     def _on_hata(self, msg):
@@ -659,13 +661,8 @@ class FHSZHesaplamaPenceresi(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    try:
-        TemaYonetimi.uygula_fusion_dark(app)
-    except Exception as e:
-        print(f"Tema uygulanamadı: {e}")
-        app.setStyle("Fusion")
-    
+    try: TemaYonetimi.uygula_fusion_dark(app)
+    except: pass
     w = FHSZHesaplamaPenceresi()
     w.show()
     sys.exit(app.exec())
