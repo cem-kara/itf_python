@@ -236,18 +236,19 @@ class KayitWorker(QThread):
 
             # --- ŞUA İZNİ ---
             elif "şua" in tip_str or "sua" in tip_str:
-                c_kullanilan = get_col("Sua_Kullanilan")
-                c_hakedis = get_col("Sua_Hakedis")
-                c_kalan = get_col("Sua_Kalan")
+                # Dinamik başlık bulma
+                c_kul = headers.index("Sua_Kullanilan") + 1
+                c_hak = headers.index("Sua_Kullanilabilir_Hak") + 1 # Eski adı: Sua_Hakedis
+                c_kal = headers.index("Sua_Kalan") + 1
                 
-                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kullanilan).value)
-                hakedis = safe_int(ws_bilgi.cell(row_idx, c_hakedis).value)
+                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kul).value)
+                mevcut_hak = safe_int(ws_bilgi.cell(row_idx, c_hak).value) # Toplam hak
                 
                 yeni_kul = max(0, mevcut_kul + (gun * katsayi))
-                yeni_kal = hakedis - yeni_kul
+                yeni_kal = mevcut_hak - yeni_kul # Kalan = Hak - Kullanılan
                 
-                ws_bilgi.update_cell(row_idx, c_kullanilan, yeni_kul)
-                ws_bilgi.update_cell(row_idx, c_kalan, yeni_kal)
+                ws_bilgi.update_cell(row_idx, c_kul, yeni_kul)
+                ws_bilgi.update_cell(row_idx, c_kal, yeni_kal)
             
             # --- DİĞER İZİNLER ---
             else:

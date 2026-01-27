@@ -2,6 +2,7 @@
 import sys
 import os
 import pandas as pd
+import time
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -9,7 +10,8 @@ from dateutil.relativedelta import relativedelta
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, 
     QTableWidgetItem, QHeaderView, QPushButton, QLabel, 
-    QComboBox, QFrame, QAbstractItemView, QProgressBar, QStyledItemDelegate, QStyle
+    QComboBox, QFrame, QAbstractItemView, QProgressBar, 
+    QStyledItemDelegate, QStyle, QMessageBox
 )
 from PySide6.QtCore import Qt, QCoreApplication, QThread, Signal, QRectF
 from PySide6.QtGui import QFont, QColor, QPainter, QBrush, QPen, QPainterPath
@@ -26,7 +28,7 @@ try:
     from temalar.tema import TemaYonetimi
     
     from google_baglanti import veritabani_getir, InternetBaglantiHatasi, KimlikDogrulamaHatasi
-    from araclar.ortak_araclar import OrtakAraclar, pencereyi_kapat, show_info, show_error
+    from araclar.ortak_araclar import OrtakAraclar, pencereyi_kapat, show_info, show_error, show_question
     from araclar.hesaplamalar import sua_hak_edis_hesapla, tr_upper, is_gunu_hesapla
     
     from gspread.cell import Cell 
@@ -35,14 +37,10 @@ except ImportError as e:
     sys.exit(1)
 
 # =============================================================================
-# DELEGATE SINIFLARI (GÜNCELLENDİ)
+# DELEGATE SINIFLARI
 # =============================================================================
 
 class ComboDelegate(QStyledItemDelegate):
-    """
-    Çalışma Koşulu sütunu için özel düzenleyici.
-    Açılır menü (Dropdown) stil iyileştirmesi yapıldı.
-    """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.items = ["Çalışma Koşulu A", "Çalışma Koşulu B"]
@@ -50,18 +48,15 @@ class ComboDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
         editor = QComboBox(parent)
         editor.addItems(self.items)
-        
-        # GÜNCELLENMİŞ STİL: Seçeneklerin net görünmesi için
         editor.setStyleSheet("""
             QComboBox {
                 background-color: #1e1e1e;
                 color: #f0f0f0;
-                border: 2px solid #0078d4; /* Aktifken mavi çerçeve */
+                border: 2px solid #0078d4;
                 border-radius: 4px;
                 padding: 4px;
                 font-weight: bold;
             }
-            /* Açılır Liste Stili */
             QComboBox QAbstractItemView {
                 background-color: #2b2b2b;
                 color: white;
@@ -71,7 +66,6 @@ class ComboDelegate(QStyledItemDelegate):
                 outline: none;
                 padding: 5px;
             }
-            /* Ok İşareti Alanı */
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
@@ -93,13 +87,9 @@ class ComboDelegate(QStyledItemDelegate):
         model.setData(index, editor.currentText(), Qt.EditRole)
         
     def updateEditorGeometry(self, editor, option, index):
-        # Editörün hücreyi tam kaplamasını sağla
         editor.setGeometry(option.rect)
 
 class SonucDelegate(QStyledItemDelegate):
-    """
-    Son sütun (Fiili Çalışma) için 'Badge' görünümlü çizim yapar.
-    """
     def paint(self, painter, option, index):
         if option.state & QStyle.State_Selected:
             painter.fillRect(option.rect, QColor("#2d2d2d")) 
@@ -118,11 +108,11 @@ class SonucDelegate(QStyledItemDelegate):
         rect.adjust(10, 8, -10, -8) 
         
         if deger > 0:
-            bg_color = QColor("#1b5e20") # Koyu Yeşil
+            bg_color = QColor("#1b5e20") 
             border_color = QColor("#66bb6a") 
             text_color = QColor("#ffffff")
         else:
-            bg_color = QColor("#333333") # Gri
+            bg_color = QColor("#333333")
             border_color = QColor("#555555")
             text_color = QColor("#aaaaaa")
 
@@ -140,68 +130,144 @@ class SonucDelegate(QStyledItemDelegate):
         painter.restore()
 
 # =============================================================================
-# WORKER: PUANTAJ KAYDETME
+# WORKER: PUANTAJ KONTROL (MÜKERRER KAYIT) - YENİ EKLENDİ
 # =============================================================================
-class PuantajKaydetWorker(QThread):
-    islem_tamam = Signal()
+class PuantajKontrolWorker(QThread):
+    durum_sinyali = Signal(bool, int) # Var mı (True/False), Kayıt Sayısı
     hata_olustu = Signal(str)
-    
-    def __init__(self, puantaj_verisi):
+
+    def __init__(self, yil, ay):
         super().__init__()
-        self.veri = puantaj_verisi
+        self.yil = str(yil)
+        self.ay = str(ay)
 
     def run(self):
         try:
-            ws_izin = veritabani_getir('personel', 'Izin_Takip')
-            if not ws_izin:
-                self.hata_olustu.emit("İzin veritabanına bağlanılamadı.")
+            ws = veritabani_getir('personel', 'FHSZ_Puantaj')
+            if not ws:
+                self.hata_olustu.emit("Veritabanına ulaşılamadı.")
                 return
 
-            batch_updates = []
-            tum_veriler = ws_izin.get_all_values()
+            all_data = ws.get_all_records()
+            count = 0
+            for row in all_data:
+                row_clean = {k.strip(): v for k, v in row.items()}
+                # Kolon isimleri değişebilir diye esnek kontrol
+                r_yil = str(row_clean.get('Ait_yil', '')).strip()
+                r_ay = str(row_clean.get('1. Dönem', '') or row_clean.get('Donem', '')).strip()
+                
+                if r_yil == self.yil and r_ay == self.ay:
+                    count += 1
             
-            if not tum_veriler:
-                 self.hata_olustu.emit("Veritabanı boş.")
-                 return
-
-            basliklar = tum_veriler[0]
-            try:
-                idx_kimlik = basliklar.index("TC Kimlik No")
-                idx_sua = -1
-                for i, b in enumerate(basliklar):
-                    if "Şua" in b and "Hak" in b:
-                        idx_sua = i
-                        break
-                if idx_sua == -1: idx_sua = len(basliklar) 
-            except ValueError:
-                self.hata_olustu.emit("Veritabanı sütun yapısı hatalı (TC Kimlik No bulunamadı).")
-                return
-
-            row_map = {} 
-            for i, row in enumerate(tum_veriler):
-                if i == 0: continue 
-                if len(row) > idx_kimlik:
-                    tc = str(row[idx_kimlik]).strip()
-                    row_map[tc] = i + 1 
-
-            updates = []
-            for tc, gun in self.veri.items():
-                if tc in row_map:
-                    row_idx = row_map[tc]
-                    updates.append(Cell(row=row_idx, col=idx_sua + 1, value=gun))
+            self.durum_sinyali.emit(count > 0, count)
             
-            if updates:
-                ws_izin.update_cells(updates)
-                self.islem_tamam.emit()
-            else:
-                self.hata_olustu.emit("Güncellenecek kayıt bulunamadı.")
-        
-        except InternetBaglantiHatasi:
-             self.hata_olustu.emit("İnternet bağlantısı kesildi. Kayıt yapılamadı.")
-        except KimlikDogrulamaHatasi:
-             self.hata_olustu.emit("Google oturum süresi doldu.")
         except Exception as e:
-            self.hata_olustu.emit(f"Kayıt işlemi hatası: {str(e)}")
+            self.hata_olustu.emit(str(e))
+
+# =============================================================================
+# WORKER: TAM KAYIT VE GÜNCELLEME - YENİ EKLENDİ
+# =============================================================================
+class TamKayitWorker(QThread):
+    log_sinyali = Signal(str)
+    islem_bitti = Signal()
+    hata_olustu = Signal(str)
+    
+    def __init__(self, puantaj_listesi, yil, ay, overwrite=False):
+        super().__init__()
+        self.veriler = puantaj_listesi # [[id, ad, yil, ay, gun, izin, saat], ...]
+        self.yil = str(yil)
+        self.ay = str(ay)
+        self.overwrite = overwrite
+
+    def run(self):
+        try:
+            self.log_sinyali.emit("⏳ Veritabanına bağlanılıyor...")
+            ws_puantaj = veritabani_getir('personel', 'FHSZ_Puantaj')
+            ws_izin = veritabani_getir('personel', 'izin_bilgi')
+            
+            # --- 1. PUANTAJ TEMİZLİĞİ (Eğer Üzerine Yazılacaksa) ---
+            if self.overwrite:
+                self.log_sinyali.emit(f"⚠️ {self.yil} {self.ay} dönemi temizleniyor...")
+                all_rows = ws_puantaj.get_all_values()
+                if len(all_rows) > 1:
+                    headers = all_rows[0]
+                    data_rows = all_rows[1:]
+                    
+                    try:
+                        idx_yil = -1
+                        idx_ay = -1
+                        for i, h in enumerate(headers):
+                            h_clean = h.strip().lower()
+                            if 'yil' in h_clean: idx_yil = i
+                            if 'dönem' in h_clean or 'donem' in h_clean: idx_ay = i
+                        
+                        if idx_yil != -1 and idx_ay != -1:
+                            # Bu döneme ait OLMAYANLARI filtrele
+                            new_data = [headers] + [r for r in data_rows if not (str(r[idx_yil]) == self.yil and str(r[idx_ay]) == self.ay)]
+                            
+                            ws_puantaj.clear()
+                            ws_puantaj.update('A1', new_data)
+                    except Exception as e:
+                        print(f"Temizleme hatası: {e}")
+
+            # --- 2. YENİ PUANTAJ KAYDI ---
+            self.log_sinyali.emit("💾 Yeni puantaj verileri kaydediliyor...")
+            ws_puantaj.append_rows(self.veriler)
+            
+            # --- 3. İZİN BİLGİ GÜNCELLEME (OTOMATİK) ---
+            self.log_sinyali.emit("🔄 Şua hak edişleri hesaplanıp güncelleniyor...")
+            
+            all_puantaj = ws_puantaj.get_all_records()
+            df = pd.DataFrame(all_puantaj)
+            
+            if not df.empty:
+                df.columns = df.columns.str.strip()
+                c_yil = next((c for c in df.columns if 'yil' in c.lower()), None)
+                c_saat = next((c for c in df.columns if 'fiili' in c.lower()), None)
+                c_id = next((c for c in df.columns if 'personel_id' in c.lower()), None)
+                
+                if c_yil and c_saat and c_id:
+                    # Sadece bu yılın verilerini alıp topla
+                    df_bu_yil = df[df[c_yil].astype(str) == self.yil].copy()
+                    df_bu_yil['saat_val'] = pd.to_numeric(df_bu_yil[c_saat].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+                    df_bu_yil['clean_id'] = df_bu_yil[c_id].astype(str).str.split('.').str[0].str.strip()
+                    
+                    kisi_toplamlari = df_bu_yil.groupby('clean_id')['saat_val'].sum().to_dict()
+                    
+                    # İzin Bilgi Tablosunu Güncelle
+                    bilgi_rows = ws_izin.get_all_values()
+                    headers_bilgi = [str(x).strip() for x in bilgi_rows[0]]
+                    
+                    target_col = "Sua_Cari_Yil_Kazanim" 
+                    kimlik_col = "TC_Kimlik"            
+                    
+                    if target_col in headers_bilgi and kimlik_col in headers_bilgi:
+                        idx_target = headers_bilgi.index(target_col) + 1
+                        idx_tc = headers_bilgi.index(kimlik_col)
+                        
+                        updates = []
+                        for i, row in enumerate(bilgi_rows[1:], start=2):
+                            raw_tc = str(row[idx_tc]).strip() if len(row) > idx_tc else ""
+                            tc = raw_tc.split('.')[0]
+                            
+                            if tc in kisi_toplamlari:
+                                yeni_hak = sua_hak_edis_hesapla(kisi_toplamlari[tc])
+                                try: mevcut = float(row[idx_target-1].replace(',', '.'))
+                                except: mevcut = -1
+                                
+                                if mevcut != yeni_hak:
+                                    updates.append(Cell(row=i, col=idx_target, value=yeni_hak))
+                        
+                        if updates:
+                            ws_izin.update_cells(updates)
+                            self.log_sinyali.emit(f"✅ {len(updates)} personelin şua kazanımı güncellendi.")
+                    else:
+                        self.log_sinyali.emit("⚠️ Sütun isimleri bulunamadı (TC_Kimlik, Sua_Cari_Yil_Kazanim).")
+
+            self.islem_bitti.emit()
+
+        except Exception as e:
+            self.hata_olustu.emit(f"İşlem hatası: {str(e)}")
 
 # =============================================================================
 # ANA FORM: FHSZ HESAPLAMA
@@ -215,19 +281,14 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.setWindowTitle("FHSZ (Şua) Hesaplama Modülü")
         self.resize(1150, 780)
         
-        # --- VERİLER ---
         self.df_personel = pd.DataFrame()
         self.df_izin = pd.DataFrame()
         self.tatil_listesi_np = []
         self.birim_kosul_map = {} 
-        self.standart_is_gunu = 22 # Varsayılan
+        self.standart_is_gunu = 22 
         
         self.setup_ui()
-        
-        # Yetki Kontrolü
         YetkiYoneticisi.uygula(self, "fhsz_hesapla")
-        
-        # Verileri Yükle
         self.verileri_yukle()
 
     def setup_ui(self):
@@ -235,7 +296,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # --- 1. ÜST PANEL (FİLTRELER) ---
+        # --- 1. ÜST PANEL ---
         filter_frame = QFrame()
         filter_frame.setObjectName("filter_frame") 
         filter_frame.setStyleSheet("""
@@ -250,7 +311,6 @@ class FHSZHesaplamaPenceresi(QWidget):
         h_layout.setContentsMargins(20, 15, 20, 15)
         h_layout.setSpacing(15)
         
-        # Yıl
         h_layout.addWidget(QLabel("Dönem Yılı:"))
         bu_yil = datetime.now().year
         self.cmb_yil = OrtakAraclar.create_combo_box(filter_frame, [str(y) for y in range(bu_yil - 3, bu_yil + 3)])
@@ -258,7 +318,6 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.cmb_yil.setFixedWidth(100)
         h_layout.addWidget(self.cmb_yil)
         
-        # Ay
         h_layout.addWidget(QLabel("Dönem Ayı:"))
         aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
                  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
@@ -267,14 +326,12 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.cmb_ay.setFixedWidth(140)
         h_layout.addWidget(self.cmb_ay)
 
-        # Bilgi Etiketi
         self.lbl_donem_bilgi = QLabel("...")
         self.lbl_donem_bilgi.setStyleSheet("color: #60cdff; font-weight: bold; margin-left: 15px; font-size: 13px;")
         h_layout.addWidget(self.lbl_donem_bilgi)
         
         h_layout.addStretch()
 
-        # Hesapla Butonu
         self.btn_hesapla = OrtakAraclar.create_button(filter_frame, "⚡ LİSTELE VE HESAPLA", self.tabloyu_olustur_ve_hesapla)
         self.btn_hesapla.setObjectName("btn_hesapla")
         self.btn_hesapla.setFixedHeight(35)
@@ -283,7 +340,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         
         main_layout.addWidget(filter_frame)
 
-        # --- 2. ORTA PANEL (TABLO) ---
+        # --- 2. ORTA PANEL ---
         self.sutunlar = ["Kimlik No", "Adı Soyadı", "Birim", "Çalışma Koşulu", 
                          "Aylık Gün", "Kullanılan İzin", "Fiili Çalışma (Saat)"]
         
@@ -295,7 +352,6 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.tablo.setAlternatingRowColors(True)
         self.tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         
-        # Başlık ve Satır Stili (Modern)
         self.tablo.setStyleSheet("""
             QTableWidget {
                 background-color: #1e1e1e;
@@ -322,13 +378,12 @@ class FHSZHesaplamaPenceresi(QWidget):
         
         header = self.tablo.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents) # Kimlik
-        header.setSectionResizeMode(3, QHeaderView.Fixed) # Koşul
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
         self.tablo.setColumnWidth(3, 180)
-        header.setSectionResizeMode(6, QHeaderView.Fixed) # Sonuç
+        header.setSectionResizeMode(6, QHeaderView.Fixed)
         self.tablo.setColumnWidth(6, 120)
 
-        # Delegate Atamaları
         self.tablo.setItemDelegateForColumn(3, ComboDelegate(self.tablo))
         self.tablo.setItemDelegateForColumn(6, SonucDelegate(self.tablo))
         
@@ -336,13 +391,13 @@ class FHSZHesaplamaPenceresi(QWidget):
 
         main_layout.addWidget(self.tablo)
         
-        # --- 3. ALT PANEL (KAYDET) ---
+        # --- 3. ALT PANEL ---
         footer_layout = QHBoxLayout()
         footer_layout.setContentsMargins(0, 5, 0, 0)
         
-        lbl_info = QLabel("ℹ️ Bilgi: 'Çalışma Koşulu' üzerine tıklayarak A/B değişimini yapabilirsiniz. Hesaplama otomatik güncellenir.")
-        lbl_info.setStyleSheet("color: #888; font-style: italic;")
-        footer_layout.addWidget(lbl_info)
+        self.lbl_durum = QLabel("Hazır") # İşlem durumunu göstermek için
+        self.lbl_durum.setStyleSheet("color: #888;")
+        footer_layout.addWidget(self.lbl_durum)
         
         footer_layout.addStretch()
         
@@ -352,7 +407,6 @@ class FHSZHesaplamaPenceresi(QWidget):
         self.progress.setTextVisible(False)
         footer_layout.addWidget(self.progress)
 
-        # İptal Butonu
         btn_iptal = QPushButton("Kapat")
         btn_iptal.setFixedSize(100, 40)
         btn_iptal.setObjectName("btn_iptal")
@@ -360,8 +414,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
         footer_layout.addWidget(btn_iptal)
 
-        # Kaydet Butonu
-        self.btn_kaydet = OrtakAraclar.create_button(self, "💾 VERİTABANINA KAYDET", self.kaydet)
+        self.btn_kaydet = OrtakAraclar.create_button(self, "💾 VERİTABANINA KAYDET", self.kaydet_baslat)
         self.btn_kaydet.setObjectName("btn_kaydet")
         self.btn_kaydet.setFixedSize(220, 40)
         footer_layout.addWidget(self.btn_kaydet)
@@ -543,115 +596,66 @@ class FHSZHesaplamaPenceresi(QWidget):
         except Exception:
             pass
 
-    def kaydet(self):
-        try:
-            ws = veritabani_getir('personel', 'FHSZ_Puantaj')
-            if not ws:
-                show_error("Hata", "FHSZ_Puantaj sayfasına erişilemedi.", self)
-                return
-            
-            ait_yil = self.cmb_yil.currentText()
-            donem_adi = self.cmb_ay.currentText() 
-            
-            self.btn_kaydet.setText("Kaydediliyor...")
-            self.btn_kaydet.setEnabled(False)
-            self.progress.setVisible(True)
-            self.progress.setRange(0, 0)
-            QApplication.setOverrideCursor(Qt.WaitCursor)
-            
-            veriler = []
-            for row in range(self.tablo.rowCount()):
-                p_id = self.tablo.item(row, 0).text()
-                ad = self.tablo.item(row, 1).text()
-                aylik_gun = self.tablo.item(row, 4).text()
-                kul_izin = self.tablo.item(row, 5).text()
-                fiili_calisma = self.tablo.item(row, 6).text()
-                
-                veriler.append([
-                    p_id,           # personel_id
-                    ad,             # Ad Soyad
-                    ait_yil,        # Ait_yil
-                    donem_adi,      # 1. Dönem
-                    aylik_gun,      # Aylık Gün
-                    kul_izin,       # Kullanılan İzin
-                    fiili_calisma   # Fiili Çalışma (saat)
-                ])
-            
-            ws.append_rows(veriler)
-            
-            self.lbl_donem_bilgi.setText("Puantaj kaydedildi, Şua hak edişleri güncelleniyor...")
-            QCoreApplication.processEvents() 
-            
-            self.izin_bilgi_guncelle(ait_yil)
-
-            show_info("Başarılı", f"{len(veriler)} kayıt başarıyla eklendi ve şua hakları güncellendi.", self)    
+    # --- YENİ KAYIT SÜRECİ (MÜKERRER KONTROLLÜ) ---
+    def kaydet_baslat(self):
+        if self.tablo.rowCount() == 0: return
         
-        except InternetBaglantiHatasi:
-             show_error("Bağlantı Hatası", "İnternet bağlantısı kesildi. Kaydedilemedi.", self)
-        except Exception as e:
-            show_error("Hata", f"Kaydetme hatası: {e}", self)
-        finally:
-            self.btn_kaydet.setText("💾 VERİTABANINA KAYDET")
-            self.btn_kaydet.setEnabled(True)
-            self.progress.setVisible(False)
-            QApplication.restoreOverrideCursor()
+        yil = self.cmb_yil.currentText()
+        ay = self.cmb_ay.currentText()
+        
+        self.btn_kaydet.setEnabled(False)
+        self.lbl_durum.setText("Kontrol ediliyor...")
+        self.progress.setVisible(True); self.progress.setRange(0,0)
+        
+        # 1. Kontrol Worker'ı Başlat
+        self.k_worker = PuantajKontrolWorker(yil, ay)
+        self.k_worker.durum_sinyali.connect(self._on_kontrol_tamam)
+        self.k_worker.hata_olustu.connect(self._on_hata)
+        self.k_worker.start()
 
-    def izin_bilgi_guncelle(self, ait_yil):
-        print(f"\n--- TOPLU GÜNCELLEME İŞLEMİ BAŞLADI ({ait_yil}) ---")
-        try:
-            ws_puantaj = veritabani_getir('personel', 'FHSZ_Puantaj')
-            ws_izin = veritabani_getir('personel', 'izin_bilgi')
+    def _on_kontrol_tamam(self, kayit_var, sayi):
+        overwrite = False
+        if kayit_var:
+            cevap = show_question("Mükerrer Kayıt", 
+                                f"{self.cmb_yil.currentText()} {self.cmb_ay.currentText()} dönemi için {sayi} kayıt bulundu.\n\n"
+                                "Eski kayıtları SİLİP, yeni hesaplamayı kaydetmek ister misiniz?", self)
+            if not cevap:
+                self.btn_kaydet.setEnabled(True)
+                self.progress.setVisible(False)
+                self.lbl_durum.setText("İptal edildi.")
+                return
+            overwrite = True
+        
+        # Verileri Hazırla
+        veriler = []
+        for r in range(self.tablo.rowCount()):
+            veriler.append([
+                self.tablo.item(r, 0).text(),
+                self.tablo.item(r, 1).text(),
+                self.cmb_yil.currentText(),
+                self.cmb_ay.currentText(),
+                self.tablo.item(r, 4).text(),
+                self.tablo.item(r, 5).text(),
+                self.tablo.item(r, 6).text()
+            ])
             
-            if not ws_puantaj or not ws_izin: return
+        # 2. Tam Kayıt Worker'ı Başlat (Otomatik Güncelleme Dahil)
+        self.t_worker = TamKayitWorker(veriler, self.cmb_yil.currentText(), self.cmb_ay.currentText(), overwrite)
+        self.t_worker.log_sinyali.connect(self.lbl_durum.setText)
+        self.t_worker.islem_bitti.connect(self._on_kayit_basarili)
+        self.t_worker.hata_olustu.connect(self._on_hata)
+        self.t_worker.start()
 
-            df_puantaj = pd.DataFrame(ws_puantaj.get_all_records())
-            if df_puantaj.empty: return
+    def _on_kayit_basarili(self):
+        self.btn_kaydet.setEnabled(True)
+        self.progress.setVisible(False)
+        show_info("Başarılı", "Puantaj kaydedildi ve şua kazanımları güncellendi.", self)
+        self.lbl_durum.setText("Hazır")
 
-            df_puantaj.columns = df_puantaj.columns.str.strip()
-            
-            col_yil = next((c for c in df_puantaj.columns if c.lower() == 'ait_yil'), None)
-            col_saat = next((c for c in df_puantaj.columns if 'fiili' in c.lower() and 'saat' in c.lower()), None)
-            col_id = next((c for c in df_puantaj.columns if 'personel_id' in c.lower()), None)
-
-            if not col_yil or not col_saat or not col_id: return
-
-            df_yil = df_puantaj[df_puantaj[col_yil].astype(str).str.split('.').str[0] == str(ait_yil)].copy()
-            df_yil['clean_id'] = df_yil[col_id].astype(str).str.split('.').str[0].str.strip()
-            df_yil[col_saat] = pd.to_numeric(df_yil[col_saat].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-
-            kisi_toplamlari = df_yil.groupby('clean_id')[col_saat].sum().to_dict()
-
-            all_values = ws_izin.get_all_values()
-            basliklar = [str(x).strip() for x in all_values[0]]
-            
-            target_col = "Hak_Edilen_sua"
-            kimlik_col = "Kimlik_No"
-
-            if target_col not in basliklar or kimlik_col not in basliklar: return
-
-            idx_hak_sua_list = basliklar.index(target_col)
-            idx_kimlik_list = basliklar.index(kimlik_col)
-            
-            gspread_col_index = idx_hak_sua_list + 1 
-            batch_updates = []
-            
-            for i, row in enumerate(all_values[1:], start=2): 
-                raw_kimlik = str(row[idx_kimlik_list]) if len(row) > idx_kimlik_list else ""
-                kimlik = raw_kimlik.split('.')[0].strip()
-                
-                if kimlik in kisi_toplamlari:
-                    toplam_saat = kisi_toplamlari[kimlik]
-                    hak_edilen_gun = sua_hak_edis_hesapla(toplam_saat)
-                    mevcut_deger = str(row[idx_hak_sua_list]) if len(row) > idx_hak_sua_list else ""
-                    
-                    if str(mevcut_deger) != str(hak_edilen_gun):
-                        batch_updates.append(Cell(row=i, col=gspread_col_index, value=hak_edilen_gun))
-
-            if batch_updates:
-                ws_izin.update_cells(batch_updates)
-                
-        except Exception as e:
-            print(f"GÜNCELLEME HATASI: {e}")
+    def _on_hata(self, msg):
+        self.btn_kaydet.setEnabled(True)
+        self.progress.setVisible(False)
+        show_error("Hata", msg, self)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

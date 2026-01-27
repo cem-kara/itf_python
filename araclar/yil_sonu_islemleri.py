@@ -22,7 +22,7 @@ except ImportError:
     print("Google bağlantı modülü bulunamadı!")
 
 # =============================================================================
-# WORKER: BATCH UPDATE (TEK SEFERDE YAZMA) İLE GÜNCELLENMİŞ
+# WORKER: BATCH UPDATE (TEK SEFERDE YAZMA)
 # =============================================================================
 class DevirWorker(QThread):
     log_sinyali = Signal(str)
@@ -35,10 +35,8 @@ class DevirWorker(QThread):
             ws_personel = veritabani_getir('personel', 'Personel')
             ws_izin = veritabani_getir('personel', 'izin_bilgi')
             
-            # 1. Verileri Çek (Tüm tabloyu hafızaya al)
+            # 1. Verileri Çek
             self.log_sinyali.emit("📥 Veriler çekiliyor...")
-            
-            # get_all_values() tüm tabloyu liste listesi olarak verir [[başlık], [satır1], [satır2]...]
             tum_personel_raw = ws_personel.get_all_values()
             tum_izin_raw = ws_izin.get_all_values()
             
@@ -49,102 +47,103 @@ class DevirWorker(QThread):
 
             # Başlıkları ve Veriyi Ayır
             izin_basliklar = tum_izin_raw[0]
-            izin_veriler = tum_izin_raw[1:] # Sadece veri satırları
+            izin_veriler = tum_izin_raw[1:]
             
             personel_basliklar = tum_personel_raw[0]
             personel_veriler = tum_personel_raw[1:]
 
-            # Sütun İndekslerini Bul
+            # --- SÜTUN İNDEKSLERİNİ BUL ---
             def get_idx(headers, name):
                 try: return headers.index(name)
                 except: return -1
 
-            # İzin Tablosu İndeksleri
+            # Yıllık İzin
             idx_tc = get_idx(izin_basliklar, "TC_Kimlik")
             idx_devir = get_idx(izin_basliklar, "Yillik_Devir")
             idx_hakedis = get_idx(izin_basliklar, "Yillik_Hakedis")
             idx_toplam = get_idx(izin_basliklar, "Yillik_Toplam_Hak")
             idx_kul = get_idx(izin_basliklar, "Yillik_Kullanilan")
             idx_kalan = get_idx(izin_basliklar, "Yillik_Kalan")
+            
+            # Şua İzin (YENİ YAPILANDIRMA)
+            idx_sua_hak = get_idx(izin_basliklar, "Sua_Kullanilabilir_Hak")
+            idx_sua_kul = get_idx(izin_basliklar, "Sua_Kullanilan")
+            idx_sua_kal = get_idx(izin_basliklar, "Sua_Kalan")
+            idx_sua_cari = get_idx(izin_basliklar, "Sua_Cari_Yil_Kazanim")
 
-            # Personel Tablosu İndeksleri
+            # Personel Bilgisi
             p_idx_tc = get_idx(personel_basliklar, "Kimlik_No")
-            p_idx_baslama = get_idx(personel_basliklar, "Baslama_Tarihi") # Veya sizin tablodaki adı neyse
+            p_idx_baslama = get_idx(personel_basliklar, "Baslama_Tarihi")
 
-            if -1 in [idx_tc, idx_devir, idx_hakedis, idx_toplam, idx_kul, idx_kalan, p_idx_tc]:
-                self.log_sinyali.emit("❌ Sütun başlıkları bulunamadı! Lütfen veritabanı yapısını kontrol edin.")
+            # Kontrol
+            if -1 in [idx_tc, idx_devir, idx_hakedis, idx_sua_hak, idx_sua_cari, p_idx_tc]:
+                self.log_sinyali.emit("❌ Kritik sütun başlıkları bulunamadı! Veritabanı yapısını kontrol edin.")
                 self.islem_bitti.emit()
                 return
 
-            # Personel Başlama Tarihlerini Haritala (Hız için)
+            # Personel Haritası
             baslama_map = {}
             for p in personel_veriler:
                 try: baslama_map[str(p[p_idx_tc]).strip()] = str(p[p_idx_baslama])
                 except: pass
 
             self.log_sinyali.emit("⚙️ Hesaplamalar yapılıyor...")
-            
-            # --- HAFIZADA İŞLEME (API YOK, SADECE MATEMATİK) ---
             guncellenmis_veriler = []
             
+            # --- DÖNGÜ VE HESAPLAMA ---
             for i, row in enumerate(izin_veriler):
-                # Orijinal satırın kopyasını al (Veri kaybını önlemek için)
-                yeni_row = list(row)
-                
+                yeni_row = list(row) # Kopyala
                 tc = str(row[idx_tc]).strip()
                 
-                # Personel verisi yoksa satırı olduğu gibi bırak
                 if tc not in baslama_map:
                     guncellenmis_veriler.append(yeni_row)
                     continue
 
                 try:
-                    # Mevcut Değerleri Al
+                    # --- A. YILLIK İZİN HESABI ---
                     eski_hakedis = int(row[idx_hakedis]) if str(row[idx_hakedis]).isdigit() else 0
-                    # Kalan, formülle hesaplanmış olabilir veya manuel olabilir. Güvenli int dönüşümü:
                     try: mevcut_kalan = int(float(str(row[idx_kalan]).replace(',', '.')))
                     except: mevcut_kalan = 0
 
-                    # 1. Yeni Devir Hesabı
+                    # 1. Yeni Devir (Kalan ile Hakediş'in küçüğü)
                     yeni_devir = min(mevcut_kalan, eski_hakedis)
                     
-                    # 2. Yeni Hakediş Hesabı
+                    # 2. Yeni Hakediş
                     hizmet_yili = self._hizmet_yili_hesapla(baslama_map.get(tc))
                     yeni_hakedis = 30 if hizmet_yili >= 10 else (20 if hizmet_yili > 0 else 0)
                     
-                    # 3. Yeni Toplamlar
-                    yeni_toplam_hak = yeni_devir + yeni_hakedis
-                    yeni_kullanilan = 0 # Sıfırla
-                    yeni_kalan = yeni_toplam_hak
-
-                    # 4. Listeyi Güncelle
+                    # 3. Yıllık İzin Güncelleme
                     yeni_row[idx_devir] = yeni_devir
                     yeni_row[idx_hakedis] = yeni_hakedis
-                    yeni_row[idx_toplam] = yeni_toplam_hak
-                    yeni_row[idx_kul] = yeni_kullanilan
-                    yeni_row[idx_kalan] = yeni_kalan
+                    yeni_row[idx_toplam] = yeni_devir + yeni_hakedis
+                    yeni_row[idx_kul] = 0 # Sıfırla
+                    yeni_row[idx_kalan] = yeni_devir + yeni_hakedis
+
+                    # --- B. ŞUA İZNİ HESABI (YENİ MANTIK) ---
+                    # Cari yıl kazanımı -> Yeni yıl hakkı olur
+                    yeni_sua_hak = int(row[idx_sua_cari]) if str(row[idx_sua_cari]).isdigit() else 0
                     
+                    # Şua İzin Güncelleme
+                    yeni_row[idx_sua_hak] = yeni_sua_hak # Cari -> Hak oldu
+                    yeni_row[idx_sua_kul] = 0            # Sıfırla
+                    yeni_row[idx_sua_kal] = yeni_sua_hak # Henüz kullanılmadı
+                    yeni_row[idx_sua_cari] = 0           # Yeni yıl için boşalt
+
                     guncellenmis_veriler.append(yeni_row)
                     
-                    # Log (Her 10 kişide bir yaz ki log şişmesin)
-                    if i % 10 == 0:
-                        self.log_sinyali.emit(f"işleniyor... {tc}")
+                    if i % 10 == 0: self.log_sinyali.emit(f"işleniyor... {tc}")
 
                 except Exception as e:
                     self.log_sinyali.emit(f"Hata ({tc}): {e}")
-                    guncellenmis_veriler.append(row) # Hata olursa eskiyi koru
+                    guncellenmis_veriler.append(row) 
 
-                # Progress Bar
                 self.progress_sinyali.emit(int((i+1)/len(izin_veriler)*100))
 
-            # --- TEK SEFERDE YAZMA (BATCH UPDATE) ---
-            self.log_sinyali.emit("📤 Güncellemeler buluta gönderiliyor (Bu işlem birkaç saniye sürebilir)...")
-            
-            # A2 hücresinden başlayarak tüm veriyi yapıştır
-            # range_name "A2" dediğimizde gspread otomatik olarak verinin boyutuna göre alanı genişletir
+            # --- TEK SEFERDE YAZMA ---
+            self.log_sinyali.emit("📤 Güncellemeler buluta gönderiliyor...")
             ws_izin.update("A2", guncellenmis_veriler)
             
-            self.log_sinyali.emit("✅ Tüm veriler başarıyla güncellendi!")
+            self.log_sinyali.emit("✅ Yıl sonu devir işlemi başarıyla tamamlandı!")
             self.islem_bitti.emit()
 
         except Exception as e:
@@ -175,17 +174,17 @@ class YilSonuDevirYoneticisi(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        grp_uyari = QGroupBox("⚠️ DİKKAT")
+        grp_uyari = QGroupBox("⚠️ DİKKAT: YIL SONU İŞLEMİ")
         grp_uyari.setStyleSheet("QGroupBox { border: 1px solid #e81123; border-radius: 5px; margin-top: 10px; font-weight: bold; color: #e81123; }")
         v_uyari = QVBoxLayout(grp_uyari)
         
         lbl_bilgi = QLabel(
-            "Bu işlem YILDA BİR KEZ (Yılbaşında) yapılmalıdır.\n"
-            "Tüm personelin izin bakiyeleri yeniden hesaplanıp Google Sheets'e TEK SEFERDE yazılacaktır.\n\n"
-            "- Eski Devirler Silinir.\n"
-            "- Kullanılmayan haklar yeni devir olur.\n"
-            "- Yeni yıl hakedişleri eklenir.\n"
-            "- 'Kullanılan' sütunu sıfırlanır."
+            "Bu işlem <b>YILDA BİR KEZ (Yılbaşında)</b> yapılmalıdır.<br><br>"
+            "<b>Yapılacak İşlemler:</b><br>"
+            "1. <b>Yıllık İzin:</b> Eski devirler silinir, sadece bu yılın artan hakkı devreder.<br>"
+            "2. <b>Şua İzni:</b> 'Cari Yıl Kazanım' sütunundaki hak, 'Kullanılabilir Hak'ka taşınır.<br>"
+            "3. <b>Genel:</b> Tüm 'Kullanılan' sayaçları sıfırlanır ve yeni yıl hakedişleri eklenir.<br><br>"
+            "<i>Lütfen işlemden önce yedek alınız!</i>"
         )
         lbl_bilgi.setWordWrap(True)
         lbl_bilgi.setStyleSheet("color: #cccccc; font-weight: normal;")
