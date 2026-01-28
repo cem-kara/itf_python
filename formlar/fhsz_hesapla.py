@@ -151,7 +151,7 @@ class PuantajKontrolWorker(QThread):
                 # Kolon isimlerindeki boşlukları temizle
                 row_clean = {k.strip(): v for k, v in row.items()}
                 
-                # Standart isimleri kontrol et (Eski isimler kalmışsa diye alternatifleri de ekledik)
+                # Standart isimleri kontrol et
                 r_yil = str(row_clean.get('Ait_Yil', '') or row_clean.get('Ait_yil', '')).strip()
                 r_ay = str(row_clean.get('Donem', '') or row_clean.get('1. Dönem', '')).strip()
                 
@@ -184,7 +184,7 @@ class TamKayitWorker(QThread):
             ws_puantaj = veritabani_getir('personel', 'FHSZ_Puantaj')
             ws_izin = veritabani_getir('personel', 'izin_bilgi')
             
-            # --- 1. PUANTAJ TEMİZLİĞİ (Eğer Üzerine Yazılacaksa) ---
+            # --- 1. PUANTAJ TEMİZLİĞİ ---
             if self.overwrite:
                 self.log_sinyali.emit(f"⚠️ {self.yil} {self.ay} dönemi temizleniyor...")
                 all_rows = ws_puantaj.get_all_values()
@@ -224,8 +224,8 @@ class TamKayitWorker(QThread):
                 
                 # Kolon adlarını bul
                 c_yil = next((c for c in df.columns if c in ['Ait_Yil', 'Ait_yil']), None)
-                c_saat = next((c for c in df.columns if 'fiili' in c.lower()), None)
-                c_id = next((c for c in df.columns if 'personel' in c.lower()), None)
+                c_saat = next((c for c in df.columns if c in ['Fiili_Calisma_Saat', 'Fiili Çalışma (saat)']), None)
+                c_id = next((c for c in df.columns if c in ['personel_id', 'Kimlik No']), None)
                 
                 if c_yil and c_saat and c_id:
                     # Sadece bu yılı filtrele
@@ -239,7 +239,6 @@ class TamKayitWorker(QThread):
                     bilgi_rows = ws_izin.get_all_values()
                     headers_bilgi = [str(x).strip() for x in bilgi_rows[0]]
                     
-                    # 🟢 YENİ SÜTUNLAR
                     target_col = "Sua_Cari_Yil_Kazanim" 
                     kimlik_col = "TC_Kimlik"            
                     
@@ -437,6 +436,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         except:
             pass
 
+    # 🟢 GÜNCELLENEN KISIM: ARTIK SABİTLER SAYFASINDAN ÇEKİYOR
     def verileri_yukle(self):
         try:
             # 1. Personel
@@ -468,22 +468,22 @@ class FHSZHesaplamaPenceresi(QWidget):
                     tatiller = pd.to_datetime(df_t['Tarih'], dayfirst=True, errors='coerce')
                     self.tatil_listesi_np = tatiller.dropna().dt.strftime('%Y-%m-%d').tolist()
             
-            # 4. Kriterler
+            # 4. Kriterler (SABİTLER SAYFASINDAN)
             self.birim_kosul_map = {}
-            ws_kriter = veritabani_getir('sabit', 'FHSZ_Kriter') 
-            if ws_kriter:
-                df_k = pd.DataFrame(ws_kriter.get_all_records())
-                if not df_k.empty:
-                    df_k.columns = df_k.columns.str.strip()
-                    col_menu = 'menuEleman' if 'menuEleman' in df_k.columns else 'MenuEleman'
-                    col_acik = 'Aciklama' if 'Aciklama' in df_k.columns else 'aciklama'
+            ws_sabit = veritabani_getir('sabit', 'Sabitler') 
+            if ws_sabit:
+                df_sabit = pd.DataFrame(ws_sabit.get_all_records())
+                if not df_sabit.empty:
+                    # Kod = Gorev_Yeri olanları filtrele
+                    df_filtre = df_sabit[df_sabit['Kod'] == 'Gorev_Yeri']
                     
-                    if col_menu in df_k.columns and col_acik in df_k.columns:
-                        for _, row in df_k.iterrows():
-                            anahtar = tr_upper(str(row[col_menu]).strip())
-                            deger = tr_upper(str(row[col_acik]).strip())
-                            kosul = "A" if ("KOŞULU A" in deger or "KOSULU A" in deger or "A" == deger) else "B"
-                            if anahtar: self.birim_kosul_map[anahtar] = kosul
+                    for _, row in df_filtre.iterrows():
+                        # MenuEleman: Birim Adı, Aciklama: Çalışma Koşulu
+                        birim = tr_upper(str(row.get('MenuEleman', '')).strip())
+                        kosul_aciklama = tr_upper(str(row.get('Aciklama', '')).strip())
+                        
+                        kosul = "A" if ("KOŞULU A" in kosul_aciklama or "KOSULU A" in kosul_aciklama or "A" == kosul_aciklama) else "B"
+                        if birim: self.birim_kosul_map[birim] = kosul
 
         except InternetBaglantiHatasi:
             show_error("Bağlantı Hatası", "İnternet bağlantısı koptu.", self)
