@@ -3,7 +3,8 @@ import sys
 import os
 import logging
 import urllib.request
-import traceback 
+import traceback
+import re # 🟢 ID AYRIŞTIRMA İÇİN EKLENDİ
 
 # PySide6 Kütüphaneleri
 from PySide6.QtCore import Qt, QDate, QThread, Signal
@@ -46,7 +47,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("PersonelDetay")
 
 # =============================================================================
-# WORKER: GÜNCELLEME VE RAPORLAMA (SİLME SORUNU GİDERİLDİ)
+# WORKER: GÜNCELLEME VE RAPORLAMA (ID SORUNU DÜZELTİLDİ)
 # =============================================================================
 class GuncelleWorker(QThread):
     islem_tamam = Signal()
@@ -85,21 +86,18 @@ class GuncelleWorker(QThread):
                     
                     if fid:
                         temp_dl_path = os.path.join(current_dir, f"temp_dl_{self.tc}.jpg")
-                        # Google Drive indirme linki (yetki gerektirmeyen durumlar için)
-                        # Eğer dosya özelse bu basit urlretrieve çalışmayabilir, 
-                        # o durumda drive.service.files().get_media kullanmak gerekir.
-                        # Şimdilik mevcut yapıyı koruyoruz.
+                        # Standart indirme linki
                         dl_url = f"https://drive.google.com/uc?export=download&id={fid}"
                         try:
                             urllib.request.urlretrieve(dl_url, temp_dl_path)
                             resim_yolu_for_word = temp_dl_path
                             temp_files_to_delete.append(temp_dl_path)
                         except:
-                            print("Resim indirme başarısız (Erişim izni gerekebilir).")
+                            print("Resim indirme başarısız (Erişim veya link sorunu).")
                 except Exception as e:
                     print(f"Mevcut resim indirme hatası: {e}")
 
-            # 🟢 RESİM FORMATLAMA (Pillow)
+            # 🟢 RESİM FORMATLAMA
             if resim_yolu_for_word and Image:
                 try:
                     img = Image.open(resim_yolu_for_word)
@@ -118,7 +116,7 @@ class GuncelleWorker(QThread):
                     print(f"Resim işleme hatası: {e}")
 
             # ---------------------------------------------------------
-            # 2. DOSYA YÜKLEME (DRIVE - Sadece Yeni Seçilenler)
+            # 2. DOSYA YÜKLEME (DRIVE)
             # ---------------------------------------------------------
             if drive:
                 id_resim = self.drive_ids.get("Personel_Resim", "")
@@ -141,29 +139,31 @@ class GuncelleWorker(QThread):
                                 print(f"Dosya yükleme hatası ({key}): {e}")
 
             # ---------------------------------------------------------
-            # 3. ESKİ ÖZLÜK DOSYASINI SİLME (DÜZELTİLDİ: supportsAllDrives)
+            # 3. ESKİ ÖZLÜK DOSYASINI SİLME (REGEX İLE DÜZELTİLDİ)
             # ---------------------------------------------------------
             eski_ozluk_link = self.links.get("OzlukDosyasi")
             
             if drive and eski_ozluk_link and hasattr(drive, 'service'):
                 try:
+                    # 🟢 YENİ ID ÇEKME YÖNTEMİ KULLANILIYOR
                     old_fid = self._get_file_id_from_link(eski_ozluk_link)
-                    print(f"Silinecek Dosya ID: {old_fid}")
-
+                    
                     if old_fid:
+                        print(f"Eski dosya siliniyor. ID: {old_fid}")
                         try:
-                            # 🟢 KRİTİK DÜZELTME: supportsAllDrives=True
                             drive.service.files().delete(
                                 fileId=old_fid, 
                                 supportsAllDrives=True
                             ).execute()
                             print("Eski özlük dosyası silindi.")
                         except Exception as delete_error:
-                            # Dosya zaten yoksa (404) hata sayma
                             if "404" in str(delete_error) or "not found" in str(delete_error).lower():
                                 print("Eski dosya zaten silinmiş (404).")
                             else:
                                 print(f"Dosya silinemedi: {delete_error}")
+                    else:
+                        print(f"Linkten geçerli bir ID çıkarılamadı: {eski_ozluk_link}")
+
                 except Exception as e:
                     print(f"Silme işleminde genel hata: {e}")
 
@@ -209,7 +209,6 @@ class GuncelleWorker(QThread):
                     id_dosyalar = self.drive_ids.get("Personel_Dosyalari", "") or self.drive_ids.get("Personel_Resim", "")
                     if id_dosyalar:
                         try:
-                            # Yeni dosyayı yükle
                             link = drive.upload_file(cikti_yolu, id_dosyalar, custom_name=f"{self.tc}_{self.data.get('ad_soyad')}_Ozluk.docx")
                             if link: self.links["OzlukDosyasi"] = link
                         except Exception as e:
@@ -261,13 +260,23 @@ class GuncelleWorker(QThread):
                     try: os.remove(p)
                     except: pass
 
-    # 🟢 YARDIMCI: LINKTEN ID ÇIKARMA
+    # 🟢 YENİ VE GÜVENLİ ID ÇIKARMA FONKSİYONU
     def _get_file_id_from_link(self, link):
+        """Linkten sadece dosya ID'sini güvenli şekilde çeker."""
         if not link: return None
         try:
-            if "id=" in link: return link.split("id=")[1].split("&")[0]
-            if "/d/" in link: return link.split("/d/")[1].split("/")[0]
-        except: pass
+            # 1. Yöntem: /d/ID/ deseni (En yaygın)
+            match = re.search(r'/d/([-\w]+)', link)
+            if match:
+                return match.group(1)
+            
+            # 2. Yöntem: id=ID deseni
+            match = re.search(r'[?&]id=([-\w]+)', link)
+            if match:
+                return match.group(1)
+                
+        except Exception as e:
+            print(f"ID ayrıştırma hatası: {e}")
         return None
 
 class ResimIndirWorker(QThread):
@@ -276,9 +285,12 @@ class ResimIndirWorker(QThread):
     def run(self):
         try:
             if not self.url: return
+            # Worker içinde de yeni metodu kullanabiliriz ama basitlik için regex burada da iş görür
             file_id = None
-            if "id=" in self.url: file_id = self.url.split("id=")[1].split("&")[0]
-            elif "/d/" in self.url: file_id = self.url.split("/d/")[1].split("/")[0]
+            match = re.search(r'/d/([-\w]+)', self.url)
+            if match: file_id = match.group(1)
+            elif "id=" in self.url: file_id = self.url.split("id=")[1].split("&")[0]
+            
             if file_id:
                 dl_url = f"https://drive.google.com/uc?export=download&id={file_id}"
                 data = urllib.request.urlopen(dl_url).read()
@@ -305,7 +317,7 @@ class PersonelDetayPenceresi(QWidget):
         self.ui = {}
         self.dosya_yollari = {"Resim": None, "Diploma1": None, "Diploma2": None}
         
-        # Linkleri Çek (Index Kontrolü ile)
+        # Linkleri Çek
         self.mevcut_linkler = {
             "Resim": self.personel_data[19] if len(self.personel_data)>19 else "",
             "Diploma1": self.personel_data[20] if len(self.personel_data)>20 else "",
