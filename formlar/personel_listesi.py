@@ -3,14 +3,17 @@ import sys
 import os
 import logging
 import random
+import re
+import urllib.request
 
 # PySide6 Kütüphaneleri
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtCore import Qt, QThread, Signal, QSize
+from PySide6.QtGui import QAction, QIcon, QPixmap, QColor, QFont, QBrush
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QTableWidgetItem, QCheckBox, QMenu, QInputDialog, 
-    QApplication, QFrame, QProgressBar, QFileDialog
+    QApplication, QFrame, QProgressBar, QFileDialog, QPushButton, QGroupBox,
+    QHeaderView
 )
 
 # Excel Kütüphanesi Kontrolü
@@ -42,7 +45,6 @@ try:
     try:
         from formlar.personel_detay import PersonelDetayPenceresi
         from formlar.personel_ekle import PersonelEklePenceresi
-        # 👇 BU SATIRI EKLEYİN 👇
         from formlar.izin_takip import IzinTakipPenceresi 
     except ImportError:
         pass
@@ -54,11 +56,63 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("PersonelListesi")
 
 # =============================================================================
-# WORKER SINIFLARI
+# WORKER: AVATAR YÜKLEYİCİ (ASENKRON & CACHED)
 # =============================================================================
+class AvatarWorker(QThread):
+    resim_hazir = Signal(int, QPixmap) 
 
+    def __init__(self, veri_listesi, temp_dir):
+        super().__init__()
+        self.veri = veri_listesi 
+        self.temp_dir = temp_dir
+        self.calisiyor = True
+
+    def run(self):
+        if not os.path.exists(self.temp_dir):
+            try: os.makedirs(self.temp_dir)
+            except: pass
+
+        for row_idx, link, tc in self.veri:
+            if not self.calisiyor: break
+            if not link: continue
+
+            local_path = os.path.join(self.temp_dir, f"{tc}_avatar.jpg")
+            pixmap = QPixmap()
+
+            if os.path.exists(local_path):
+                pixmap.load(local_path)
+            else:
+                try:
+                    file_id = self._get_id(link)
+                    if file_id:
+                        dl_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+                        data = urllib.request.urlopen(dl_url, timeout=5).read()
+                        pixmap.loadFromData(data)
+                        pixmap = pixmap.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        pixmap.save(local_path, "JPG")
+                except:
+                    continue 
+
+            if not pixmap.isNull():
+                final_pix = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.resim_hazir.emit(row_idx, final_pix)
+
+    def _get_id(self, link):
+        try:
+            match = re.search(r'/d/([-\w]+)', link)
+            if match: return match.group(1)
+            match = re.search(r'[?&]id=([-\w]+)', link)
+            if match: return match.group(1)
+        except: pass
+        return None
+
+    def durdur(self):
+        self.calisiyor = False
+
+# =============================================================================
+# WORKER: VERİ İŞLEMLERİ
+# =============================================================================
 class VeriYukleWorker(QThread):
-    """Personel listesini çeker."""
     veri_indi = Signal(list)
     hata_olustu = Signal(str)
 
@@ -66,15 +120,10 @@ class VeriYukleWorker(QThread):
         try:
             ws = veritabani_getir('personel', 'Personel')
             self.veri_indi.emit(ws.get_all_values())
-        except InternetBaglantiHatasi:
-            self.hata_olustu.emit("İnternet bağlantısı yok. Lütfen kontrol edin.")
-        except KimlikDogrulamaHatasi:
-            self.hata_olustu.emit("Google oturum süresi doldu. Giriş yenilenmeli.")
         except Exception as e:
-            self.hata_olustu.emit(f"Veri çekme hatası: {str(e)}")
+            self.hata_olustu.emit(f"Veri hatası: {str(e)}")
 
 class DurumGuncelleWorker(QThread):
-    """Personel durumunu günceller."""
     islem_tamam = Signal()
     hata_olustu = Signal(str)
     
@@ -88,68 +137,61 @@ class DurumGuncelleWorker(QThread):
             ws = veritabani_getir('personel', 'Personel')
             cell = ws.find(self.tc_no)
             if cell:
-                basliklar = ws.row_values(1)
-                try: durum_col_idx = basliklar.index("Durum") + 1
-                except ValueError: durum_col_idx = len(basliklar) + 1
+                headers = ws.row_values(1)
+                try: col = headers.index("Durum") + 1
+                except: 
+                    # Durum sütunu bulunamazsa varsayılan olarak 24. sütun (X)
+                    col = 24 
                 
-                ws.update_cell(cell.row, durum_col_idx, self.yeni_durum)
+                ws.update_cell(cell.row, col, self.yeni_durum)
                 self.islem_tamam.emit()
             else:
-                self.hata_olustu.emit("Personel veritabanında bulunamadı.")
+                self.hata_olustu.emit("Personel bulunamadı.")
         except Exception as e:
-            self.hata_olustu.emit(f"Güncelleme hatası: {str(e)}")
+            self.hata_olustu.emit(f"Hata: {str(e)}")
 
 class SabitlerWorker(QThread):
-    """Filtreleme için Hizmet Sınıflarını çeker."""
-    veri_indi = Signal(list) 
-    
+    veri_indi = Signal(list, list) # Gorev Yeri Listesi, Hizmet Sınıfı Listesi
+
     def run(self):
         try:
             ws = veritabani_getir('sabit', 'Sabitler')
+            gorev_yerleri = set()
             hizmet_siniflari = set()
             
             if ws:
-                records = ws.get_all_records()
-                for satir in records:
-                    kod = str(satir.get('Kod', '')).strip()
-                    eleman = str(satir.get('MenuEleman', '')).strip()
-                    
-                    if kod == "Hizmet_Sinifi":
-                        hizmet_siniflari.add(eleman)
+                for r in ws.get_all_records():
+                    kod = str(r.get('Kod')).strip()
+                    val = str(r.get('MenuEleman')).strip()
+                    if kod == "Gorev_Yeri":
+                        gorev_yerleri.add(val)
+                    elif kod == "Hizmet_Sinifi":
+                        hizmet_siniflari.add(val)
             
-            sirali_liste = sorted(list(hizmet_siniflari))
-            sirali_liste.insert(0, "Tümü")
+            l_gorev = sorted(list(gorev_yerleri))
+            l_gorev.insert(0, "Tüm Birimler")
             
-            self.veri_indi.emit(sirali_liste)
-        except Exception as e: 
-            print(f"Sabitler hatası: {e}")
-            self.veri_indi.emit(["Tümü"]) 
+            l_hizmet = sorted(list(hizmet_siniflari))
+            l_hizmet.insert(0, "Tüm Sınıflar")
+            
+            self.veri_indi.emit(l_gorev, l_hizmet)
+        except:
+            self.veri_indi.emit(["Tüm Birimler"], ["Tüm Sınıflar"])
 
 class KullaniciEkleWorker(QThread):
-    """Personeli sisteme kullanıcı olarak ekler."""
     sonuc = Signal(bool, str)
-    
-    def __init__(self, kimlik, ad_soyad, rol):
-        super().__init__()
-        self.kimlik = kimlik
-        self.ad_soyad = ad_soyad
-        self.rol = rol
-
+    def __init__(self, kimlik, ad, rol): super().__init__(); self.k, self.a, self.r = kimlik, ad, rol
     def run(self):
         try:
             ws = veritabani_getir('user', 'user_login')
-            tum_kullanicilar = ws.get_all_records()
-            for u in tum_kullanicilar:
-                if str(u.get('username')) == self.kimlik:
-                    self.sonuc.emit(False, "Bu personel zaten kullanıcı olarak tanımlı.")
-                    return
-
-            user_id = random.randint(10000, 99999)
-            sifreli_pass = GuvenlikAraclari.sifrele("12345")
-            ws.append_row([user_id, self.kimlik, sifreli_pass, self.rol, "", "EVET"])
-            self.sonuc.emit(True, f"{self.ad_soyad} sisteme eklendi.\nVarsayılan Şifre: 12345")
-        except Exception as e:
-            self.sonuc.emit(False, f"Kullanıcı ekleme hatası: {str(e)}")
+            for u in ws.get_all_records():
+                if str(u.get('username')) == self.k:
+                    self.sonuc.emit(False, "Zaten kullanıcı."); return
+            uid = random.randint(10000, 99999)
+            pw = GuvenlikAraclari.sifrele("12345")
+            ws.append_row([uid, self.k, pw, self.r, "", "EVET"])
+            self.sonuc.emit(True, f"Eklendi.\nŞifre: 12345")
+        except Exception as e: self.sonuc.emit(False, str(e))
 
 # =============================================================================
 # PERSONEL LİSTESİ FORMU
@@ -157,15 +199,21 @@ class KullaniciEkleWorker(QThread):
 class PersonelListesiPenceresi(QWidget):
     def __init__(self, yetki='viewer', kullanici_adi=None):
         super().__init__()
-        self.setWindowTitle("Personel Listesi")
-        self.resize(1200, 750)
-        
+        self.setWindowTitle("Personel Yönetim Paneli")
+        self.resize(1300, 800)
         self.yetki = yetki
         self.kullanici_adi = kullanici_adi
         
         self.ham_veri = []
         self.basliklar = []
-        self.idx_durum = -1
+        self.avatar_thread = None
+        self.temp_avatar_dir = os.path.join(root_dir, "temp", "avatars")
+        
+        # 🟢 Varsayılan Filtre
+        self.secili_durum_filtresi = "Aktif" 
+        
+        # 🟢 Durum Sütunu İndeksi (Otomatik bulunacak)
+        self.idx_durum = -1 
         
         self._setup_ui()
         YetkiYoneticisi.uygula(self, "personel_listesi")
@@ -174,85 +222,122 @@ class PersonelListesiPenceresi(QWidget):
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(10)
         
-        # --- ÜST BAR ---
-        top_bar = QHBoxLayout()
-        top_bar.setSpacing(10)
+        # --- 1. ÜST FİLTRE PANELİ ---
+        filter_frame = QFrame()
+        filter_frame.setObjectName("filter_frame")
+        filter_frame.setStyleSheet("""
+            QFrame#filter_frame { background-color: #2b2b2b; border-radius: 8px; border: 1px solid #3e3e3e; }
+            QPushButton { padding: 6px 15px; border-radius: 4px; font-weight: bold; }
+            QPushButton:hover { background-color: #444; }
+        """)
+        h_filter = QHBoxLayout(filter_frame)
+        h_filter.setContentsMargins(10, 10, 10, 10)
+        
+        # A. Durum Butonları
+        self.btn_aktif = self._create_filter_btn("Aktifler", "#28a745", lambda: self._durum_filtre_degistir("Aktif"))
+        self.btn_pasif = self._create_filter_btn("Pasifler", "#dc3545", lambda: self._durum_filtre_degistir("Pasif"))
+        self.btn_izinli = self._create_filter_btn("İzinliler", "#ffc107", lambda: self._durum_filtre_degistir("İzinli"), text_color="black")
+        self.btn_tumu = self._create_filter_btn("Tümü", "#6c757d", lambda: self._durum_filtre_degistir("Tümü"))
+        
+        h_filter.addWidget(self.btn_aktif)
+        h_filter.addWidget(self.btn_pasif)
+        h_filter.addWidget(self.btn_izinli)
+        h_filter.addWidget(self.btn_tumu)
+        
+        h_filter.addSpacing(20) 
+        
+        # B. Görev Yeri Filtresi
+        self.cmb_gorev_yeri = OrtakAraclar.create_combo_box(self)
+        self.cmb_gorev_yeri.addItem("Birimler Yükleniyor...")
+        self.cmb_gorev_yeri.setFixedWidth(220)
+        self.cmb_gorev_yeri.currentIndexChanged.connect(self._filtrele_tetikle)
+        h_filter.addWidget(QLabel("Birim:"))
+        h_filter.addWidget(self.cmb_gorev_yeri)
 
-        # 1. Arama
-        self.txt_ara = OrtakAraclar.create_line_edit(self, placeholder="🔍 İsim, TC veya Birim ara...")
-        self.txt_ara.setMinimumWidth(250)
-        self.txt_ara.textChanged.connect(self._filtrele_tetikle)
-
-        # 2. Filtre
+        # C. Hizmet Sınıfı Filtresi
         self.cmb_hizmet_filtre = OrtakAraclar.create_combo_box(self)
-        self.cmb_hizmet_filtre.addItem("Hizmet Sınıfı (Yükleniyor...)")
-        self.cmb_hizmet_filtre.setMinimumWidth(250)
+        self.cmb_hizmet_filtre.addItem("Sınıflar Yükleniyor...")
+        self.cmb_hizmet_filtre.setFixedWidth(180)
         self.cmb_hizmet_filtre.currentIndexChanged.connect(self._filtrele_tetikle)
-
-        # 3. Checkbox
-        self.chk_pasif_goster = QCheckBox("Eski Personelleri Göster")
-        self.chk_pasif_goster.stateChanged.connect(self._filtrele_tetikle)
-
-        # 4. Butonlar
-        self.btn_yeni = OrtakAraclar.create_button(self, " + Yeni Personel", self._yeni_personel_ac)
-        self.btn_yeni.setObjectName("btn_yeni") 
+        h_filter.addWidget(self.cmb_hizmet_filtre)
         
-        self.btn_yazdir = OrtakAraclar.create_button(self, "🖨️ Excel'e Aktar", self._listeyi_yazdir)
-        self.btn_yazdir.setStyleSheet("background-color: #2e7d32; color: white;") 
+        h_filter.addStretch()
         
-        self.btn_yenile = OrtakAraclar.create_button(self, " Yenile", self._verileri_yenile)
-        self.btn_yenile.setObjectName("btn_yenile")
-
-        top_bar.addWidget(self.txt_ara)
-        top_bar.addWidget(self.cmb_hizmet_filtre)
-        top_bar.addWidget(self.chk_pasif_goster)
-        top_bar.addStretch() 
-        top_bar.addWidget(self.btn_yeni)
-        top_bar.addWidget(self.btn_yazdir)
-        top_bar.addWidget(self.btn_yenile)
+        # D. İşlem Butonları
+        self.btn_yeni = OrtakAraclar.create_button(self, " + Yeni", self._yeni_personel_ac)
+        self.btn_yeni.setFixedWidth(80)
         
-        main_layout.addLayout(top_bar)
+        self.btn_yenile = OrtakAraclar.create_button(self, "⟳ Yenile", self._verileri_yenile)
+        self.btn_yenile.setFixedWidth(80)
+        
+        h_filter.addWidget(self.btn_yeni)
+        h_filter.addWidget(self.btn_yenile)
+        
+        main_layout.addWidget(filter_frame)
 
-        # --- TABLO ---
-        headers = ["TC Kimlik", "Ad Soyad", "Hizmet Sınıfı", "Ünvan", "Görev Yeri", "Cep Telefonu", "Durum"]
+        # --- 2. TABLO ---
+        headers = ["Foto", "TC Kimlik", "Ad Soyad", "Hizmet Sınıfı", "Ünvan", "Görev Yeri", "Cep Tel", "Durum"]
         self.table = OrtakAraclar.create_table(self, headers)
+        self.table.setIconSize(QSize(32, 32)) 
+        
+        # Sütun Genişlik Ayarı (Resim Sabit, Diğerleri Yayıl)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch) # Varsayılan: Yayıl
+        header.setSectionResizeMode(0, QHeaderView.Fixed) # İstisna: Resim Sabit
+        self.table.setColumnWidth(0, 50) 
+        
         self.table.cellDoubleClicked.connect(self._detay_ac)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._sag_tik_menu)
+        
         main_layout.addWidget(self.table)
 
-        # --- FOOTER ---
-        bottom_layout = QHBoxLayout()
-        self.lbl_kayit_sayisi = QLabel("Toplam Kayıt: 0")
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        self.progress.setFixedHeight(10)
+        # --- 3. FOOTER ---
+        footer = QHBoxLayout()
+        self.lbl_info = QLabel("Hazır")
+        self.progress = QProgressBar(); self.progress.setVisible(False); self.progress.setFixedWidth(200)
+        self.btn_excel = OrtakAraclar.create_button(self, "Excel", self._listeyi_yazdir)
+        self.btn_excel.setFixedSize(80, 30)
         
-        bottom_layout.addWidget(self.lbl_kayit_sayisi)
-        bottom_layout.addStretch()
-        bottom_layout.addWidget(self.progress)
-        main_layout.addLayout(bottom_layout)
+        footer.addWidget(self.lbl_info)
+        footer.addStretch()
+        footer.addWidget(self.progress)
+        footer.addWidget(self.btn_excel)
+        main_layout.addLayout(footer)
+
+    def _create_filter_btn(self, text, color, func, text_color="white"):
+        btn = QPushButton(text)
+        btn.setStyleSheet(f"background-color: {color}; color: {text_color}; border: none;")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(func)
+        return btn
 
     # --- İŞLEMLER ---
+    
+    def _durum_filtre_degistir(self, durum):
+        self.secili_durum_filtresi = durum
+        self._filtrele_tetikle()
 
     def _sabitleri_yukle(self):
         self.sabit_worker = SabitlerWorker()
         self.sabit_worker.veri_indi.connect(self._sabitler_geldi)
         self.sabit_worker.start()
 
-    def _sabitler_geldi(self, liste):
+    def _sabitler_geldi(self, birimler, siniflar):
+        self.cmb_gorev_yeri.clear()
+        self.cmb_gorev_yeri.addItems(birimler)
         self.cmb_hizmet_filtre.clear()
-        self.cmb_hizmet_filtre.addItems(liste)
+        self.cmb_hizmet_filtre.addItems(siniflar)
 
     def _verileri_yenile(self):
         self.progress.setVisible(True); self.progress.setRange(0, 0)
         self.btn_yenile.setEnabled(False)
         self.worker = VeriYukleWorker()
         self.worker.veri_indi.connect(self._veri_geldi)
-        self.worker.hata_olustu.connect(self._hata_goster)
+        self.worker.hata_olustu.connect(lambda m: (self.progress.setVisible(False), show_error("Hata", m, self)))
         self.worker.start()
 
     def _veri_geldi(self, veri_listesi):
@@ -263,185 +348,192 @@ class PersonelListesiPenceresi(QWidget):
         self.basliklar = veri_listesi[0]
         self.ham_veri = veri_listesi[1:] 
         
-        # Sütun İndekslerini Bul
-        try: self.idx_durum = self.basliklar.index("Durum")
-        except ValueError: self.idx_durum = -1
+        # 🟢 Durum Sütununu Otomatik Bul (Hata Çözümü)
+        try:
+            self.idx_durum = self.basliklar.index("Durum")
+        except ValueError:
+            # Bulamazsa varsayılan 23 (X sütunu)
+            self.idx_durum = 23
             
-        self._filtrele_tetikle()
-
-    def _hata_goster(self, mesaj):
-        self.progress.setVisible(False)
-        self.btn_yenile.setEnabled(True)
-        show_error("Hata", mesaj, self)
+        self._filtrele_tetikle() 
 
     def _filtrele_tetikle(self):
-        text = self.txt_ara.text().lower().strip()
-        secilen_sinif = self.cmb_hizmet_filtre.currentText()
-        pasifleri_goster = self.chk_pasif_goster.isChecked()
-        idx_hizmet = 4 
-        filtrelenmis_veri = []
+        if not self.ham_veri: return
         
-        for satir in self.ham_veri:
-            satir_str = " ".join([str(x).lower() for x in satir])
-            sinif_degeri = satir[idx_hizmet] if len(satir) > idx_hizmet else ""
-            durum_degeri = "Aktif"
-            if self.idx_durum != -1 and len(satir) > self.idx_durum:
-                durum_degeri = str(satir[self.idx_durum]).strip()
+        hedef_durum = self.secili_durum_filtresi
+        hedef_birim = self.cmb_gorev_yeri.currentText()
+        hedef_sinif = self.cmb_hizmet_filtre.currentText()
+        
+        if "Tüm" in hedef_birim: hedef_birim = ""
+        if "Tüm" in hedef_sinif: hedef_sinif = ""
+        
+        # Sütun İndeksleri
+        idx_sinif = 4
+        idx_birim = 6
+        # idx_durum artık dinamik bulunuyor (self.idx_durum)
+        
+        filtrelenmis = []
+        for row in self.ham_veri:
+            row_sinif = str(row[idx_sinif]).strip() if len(row) > idx_sinif else ""
+            row_birim = str(row[idx_birim]).strip() if len(row) > idx_birim else ""
             
-            if not pasifleri_goster and durum_degeri == "Pasif": continue
-
-            if (text in satir_str) and ((secilen_sinif == "Tümü" or "Yükleniyor" in secilen_sinif) or (sinif_degeri == secilen_sinif)):
-                filtrelenmis_veri.append(satir)
-        self._tabloyu_doldur(filtrelenmis_veri)
+            # Durum verisini doğru sütundan çek
+            row_durum = str(row[self.idx_durum]).strip() if len(row) > self.idx_durum else "Aktif"
+            
+            # 1. Durum Filtresi
+            if hedef_durum != "Tümü":
+                if hedef_durum == "Aktif":
+                    # "Aktif", "İzinli", "Raporlu" hepsi Aktif kategorisindedir
+                    if row_durum == "Pasif": continue
+                elif hedef_durum not in row_durum: continue
+            
+            # 2. Birim Filtresi
+            if hedef_birim and hedef_birim != row_birim: continue
+            
+            # 3. Sınıf Filtresi
+            if hedef_sinif and hedef_sinif != row_sinif: continue
+            
+            filtrelenmis.append(row)
+            
+        self._tabloyu_doldur(filtrelenmis)
 
     def _tabloyu_doldur(self, veri_seti):
         self.table.setRowCount(0)
-        self.table.setRowCount(len(veri_seti))
-        self.lbl_kayit_sayisi.setText(f"Görüntülenen Kayıt: {len(veri_seti)}")
         
-        gosterilecek_indexler = [0, 1, 4, 5, 6, 9] 
+        if self.avatar_thread and self.avatar_thread.isRunning():
+            self.avatar_thread.durdur()
+            self.avatar_thread.wait()
+        
+        self.table.setRowCount(len(veri_seti))
+        self.lbl_info.setText(f"Gösterilen: {len(veri_seti)} | Filtre: {self.secili_durum_filtresi}")
+        
+        avatar_queue = [] 
+        
+        col_map = [0, 1, 4, 5, 6, 9] 
+        idx_resim = 19
+        
         for i, row in enumerate(veri_seti):
-            durum_val = row[self.idx_durum] if self.idx_durum != -1 and len(row) > self.idx_durum else "Aktif"
-            col_counter = 0
-            for idx in gosterilecek_indexler:
-                val = row[idx] if len(row) > idx else ""
+            item_foto = QTableWidgetItem()
+            item_foto.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(i, 0, item_foto)
+            
+            resim_link = row[idx_resim] if len(row) > idx_resim else ""
+            if resim_link: avatar_queue.append((i, resim_link, row[0]))
+            
+            for t_col, d_idx in enumerate(col_map, 1): 
+                val = row[d_idx] if len(row) > d_idx else ""
                 item = QTableWidgetItem(str(val))
-                self.table.setItem(i, col_counter, item)
-                col_counter += 1
+                self.table.setItem(i, t_col, item)
             
-            item_durum = QTableWidgetItem(str(durum_val))
-            if durum_val == "Pasif": item_durum.setForeground(Qt.red)
-            else: item_durum.setForeground(Qt.green)
-            self.table.setItem(i, col_counter, item_durum)
-            self.table.item(i, 0).setData(Qt.UserRole, row)
+            # Durum Hücresi
+            durum_val = row[self.idx_durum] if len(row) > self.idx_durum else "Aktif"
+            item_durum = QTableWidgetItem(durum_val)
+            item_durum.setTextAlignment(Qt.AlignCenter)
+            
+            bg_color = None
+            fg_color = Qt.white
+            
+            if "Aktif" in durum_val: fg_color = QColor("#4cd964") 
+            elif "Pasif" in durum_val: fg_color = QColor("#ff3b30") 
+            elif "İzin" in durum_val: fg_color = QColor("#ffcc00"); item_durum.setForeground(Qt.black)
+            elif "Rapor" in durum_val: bg_color = QColor("#ff3b30")
+            
+            item_durum.setForeground(fg_color)
+            if bg_color: item_durum.setBackground(bg_color)
+            item_durum.setFont(QFont("Segoe UI", 9, QFont.Bold))
+            
+            self.table.setItem(i, 7, item_durum)
+            self.table.item(i, 1).setData(Qt.UserRole, row)
 
-    # 🟢 TEMİZLENMİŞ EXCEL YAZDIRMA
-    def _listeyi_yazdir(self):
-        if openpyxl is None:
-            show_error("Kütüphane Hatası", "Excel yazdırma işlemi için 'openpyxl' modülü gereklidir.", self)
-            return
+        if avatar_queue:
+            self.avatar_thread = AvatarWorker(avatar_queue, self.temp_avatar_dir)
+            self.avatar_thread.resim_hazir.connect(self._avatar_guncelle)
+            self.avatar_thread.start()
 
-        dosya_yolu, _ = QFileDialog.getSaveFileName(self, "Excel Olarak Kaydet", "Personel_Listesi.xlsx", "Excel Dosyası (*.xlsx)")
-        if not dosya_yolu: return
-
+    def _avatar_guncelle(self, row, pixmap):
         try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Personel Listesi"
-            
-            # Başlıklar
-            ws.append(["TC Kimlik", "Ad Soyad", "Hizmet Sınıfı", "Görev Yeri"])
-            
-            row_count = self.table.rowCount()
-            for row in range(row_count):
-                tc = self.table.item(row, 0).text()
-                ad = self.table.item(row, 1).text()
-                hizmet = self.table.item(row, 2).text()
-                gorev_yeri = self.table.item(row, 4).text()
-                
-                ws.append([tc, ad, hizmet, gorev_yeri])
-            
-            for col in ws.columns:
-                max_length = 0
-                column = col[0].column_letter
-                for cell in col:
-                    try:
-                        if len(str(cell.value)) > max_length: max_length = len(cell.value)
-                    except: pass
-                ws.column_dimensions[column].width = (max_length + 2)
+            item = self.table.item(row, 0)
+            if item: item.setIcon(QIcon(pixmap))
+        except: pass
 
-            wb.save(dosya_yolu)
-            show_info("Başarılı", f"Liste başarıyla kaydedildi:\n{dosya_yolu}", self)
-            
-        except Exception as e:
-            show_error("Yazdırma Hatası", f"Excel dosyası oluşturulamadı:\n{str(e)}", self)
-
-    def _sag_tik_menu(self, position):
+    # --- MENU VE DİĞERLERİ ---
+    def _sag_tik_menu(self, pos):
         menu = QMenu()
-        secili_satir = self.table.currentRow()
-        if secili_satir >= 0:
-            item_tc = self.table.item(secili_satir, 0)
-            item_ad = self.table.item(secili_satir, 1)
-            if item_tc:
-                tc_no = item_tc.text()
-                ad_soyad = item_ad.text()
-                row_data = item_tc.data(Qt.UserRole)
-                durum = row_data[self.idx_durum] if self.idx_durum != -1 else "Aktif"
+        r = self.table.currentRow()
+        if r >= 0:
+            item = self.table.item(r, 1) 
+            if item:
+                data = item.data(Qt.UserRole)
+                tc, ad = data[0], data[1]
                 
-                act_detay = QAction("📝 Detay Görüntüle", self)
-                act_detay.triggered.connect(lambda: self._detay_ac(secili_satir, 0))
-                menu.addAction(act_detay)
-                menu.addSeparator()
+                # Durumu self.idx_durum ile doğru çek
+                durum = data[self.idx_durum] if len(data) > self.idx_durum else "Aktif"
                 
-                # 🟢 YENİ: İzin Menüsü
-                act_izin = QAction("🏖️ İzin Giriş / Takip", self)
-                act_izin.triggered.connect(lambda: self._izin_formu_ac(row_data))
-                menu.addAction(act_izin)
-                menu.addSeparator() # Ayırıcı çizgi
-                act_user = QAction("🔑 Kullanıcı Yetkilendirme", self)
-                act_user.triggered.connect(lambda: self._kullanici_yap(tc_no, ad_soyad))
-                menu.addAction(act_user)
+                menu.addAction("📝 Detay Görüntüle", lambda: self._detay_ac(r, 0))
                 menu.addSeparator()
-                act_durum = QAction(f"{'♻️ Aktif Yap' if durum == 'Pasif' else '🗑️ Pasife Al'}", self)
-                act_durum.triggered.connect(lambda: self._durum_degistir(tc_no, "Aktif" if durum == "Pasif" else "Pasif"))
-                menu.addAction(act_durum)
+                menu.addAction("🏖️ İzin Giriş/Takip", lambda: self._izin_formu_ac(data))
                 menu.addSeparator()
-                                               
-        menu.exec(self.table.viewport().mapToGlobal(position))
+                menu.addAction("🔑 Kullanıcı Yap", lambda: self._kullanici_yap(tc, ad))
+                act_d = menu.addAction(f"{'♻️ Aktif Yap' if durum=='Pasif' else '🗑️ Pasife Al'}")
+                act_d.triggered.connect(lambda: self._durum_degistir(tc, "Aktif" if durum=="Pasif" else "Pasif"))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
-    def _detay_ac(self, row, column):
-        item = self.table.item(row, 0)
+    def _detay_ac(self, r, c):
+        item = self.table.item(r, 1)
         if item:
-            personel_data = item.data(Qt.UserRole)
+            data = item.data(Qt.UserRole)
             if 'PersonelDetayPenceresi' in globals():
-                self.detay_win = PersonelDetayPenceresi(personel_data, self.yetki, self.kullanici_adi)
-                self.detay_win.veri_guncellendi.connect(self._verileri_yenile)
-                OrtakAraclar.mdi_pencere_ac(self, self.detay_win, f"Detay: {personel_data[1]}")
-            else: show_info("Bilgi", "Detay modülü henüz yüklenmedi.", self)
-            
-    def _izin_formu_ac(self, personel_data):
-        """Seçili personel için izin takip penceresini açar."""
+                self.win_detay = PersonelDetayPenceresi(data, self.yetki, self.kullanici_adi)
+                self.win_detay.veri_guncellendi.connect(self._verileri_yenile)
+                OrtakAraclar.mdi_pencere_ac(self, self.win_detay, f"Detay: {data[1]}")
+
+    def _izin_formu_ac(self, data):
         if 'IzinTakipPenceresi' in globals():
-            self.izin_win = IzinTakipPenceresi(personel_data, self.yetki, self.kullanici_adi)
-            OrtakAraclar.mdi_pencere_ac(self, self.izin_win, f"İzin: {personel_data[1]}")
-        else:
-            show_info("Bilgi", "İzin modülü henüz yüklenmedi veya dosyası eksik.", self)
+            self.win_izin = IzinTakipPenceresi(data, self.yetki, self.kullanici_adi)
+            OrtakAraclar.mdi_pencere_ac(self, self.win_izin, f"İzin: {data[1]}")
 
     def _yeni_personel_ac(self):
         if 'PersonelEklePenceresi' in globals():
-            self.ekle_win = PersonelEklePenceresi(self.yetki, self.kullanici_adi)
-            OrtakAraclar.mdi_pencere_ac(self, self.ekle_win, "Yeni Personel Ekle")
-        else: show_info("Bilgi", "Personel Ekleme modülü henüz yüklenmedi.", self)
+            self.win_ekle = PersonelEklePenceresi(self.yetki, self.kullanici_adi)
+            OrtakAraclar.mdi_pencere_ac(self, self.win_ekle, "Personel Ekle")
 
     def _kullanici_yap(self, tc, ad):
-        roller = ["viewer", "user", "admin", "admin_mudur"]
-        rol, ok = QInputDialog.getItem(self, "Yetki Seçimi", f"{ad} için yetki düzeyi:", roller, 0, False)
-        if ok and rol:
-            if show_question("Onay", f"{ad} sisteme '{rol}' yetkisiyle eklenecek.\nOnaylıyor musunuz?", self):
-                self.progress.setVisible(True)
+        rol, ok = QInputDialog.getItem(self, "Yetki", f"{ad} yetkisi:", ["viewer","user","admin","admin_mudur"], 0, False)
+        if ok:
+            if show_question("Onay", "Kullanıcı eklensin mi?", self):
                 self.u_worker = KullaniciEkleWorker(tc, ad, rol)
-                self.u_worker.sonuc.connect(lambda b, m: (self.progress.setVisible(False), show_info("Bilgi", m, self) if b else show_error("Hata", m, self)))
+                self.u_worker.sonuc.connect(lambda b, m: show_info("Bilgi", m, self) if b else show_error("Hata", m, self))
                 self.u_worker.start()
 
-    def _durum_degistir(self, tc, yeni_durum):
-        if show_question("Durum Değişikliği", f"Personel durumu '{yeni_durum}' yapılacak. Emin misiniz?", self):
+    def _durum_degistir(self, tc, d):
+        if show_question("Onay", f"Durum '{d}' yapılacak?", self):
             self.progress.setVisible(True)
-            self.d_worker = DurumGuncelleWorker(tc, yeni_durum)
-            self.d_worker.islem_tamam.connect(lambda: (show_info("Başarılı", "Güncellendi", self), self._verileri_yenile()))
-            self.d_worker.hata_olustu.connect(lambda m: self._hata_goster(m))
+            self.d_worker = DurumGuncelleWorker(tc, d)
+            self.d_worker.islem_tamam.connect(lambda: (show_info("Tamam", "Güncellendi", self), self._verileri_yenile()))
+            self.d_worker.hata_olustu.connect(lambda m: show_error("Hata", m, self))
             self.d_worker.start()
 
-    def closeEvent(self, event):
-        for attr in ['worker', 'sabit_worker', 'u_worker', 'd_worker']:
-            if hasattr(self, attr):
-                w = getattr(self, attr)
-                if w and w.isRunning(): w.quit(); w.wait(500)
-        event.accept()
+    def _listeyi_yazdir(self):
+        if not openpyxl: return show_error("Hata", "openpyxl modülü yok.", self)
+        path, _ = QFileDialog.getSaveFileName(self, "Kaydet", "Liste.xlsx", "Excel (*.xlsx)")
+        if path:
+            try:
+                wb = openpyxl.Workbook(); ws = wb.active; ws.append(["TC", "Ad", "Birim", "Durum"])
+                for r in range(self.table.rowCount()):
+                    ws.append([self.table.item(r,1).text(), self.table.item(r,2).text(), self.table.item(r,5).text(), self.table.item(r,7).text()])
+                wb.save(path); show_info("Tamam", "Kaydedildi.", self)
+            except Exception as e: show_error("Hata", str(e), self)
+
+    def closeEvent(self, e):
+        if self.avatar_thread: self.avatar_thread.durdur()
+        for w in ['worker', 'sabit_worker', 'u_worker', 'd_worker']:
+            if hasattr(self, w) and getattr(self, w).isRunning(): getattr(self, w).quit()
+        e.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     try: TemaYonetimi.uygula_fusion_dark(app)
-    except Exception as e: print(f"Tema uygulanamadı: {e}")
+    except: pass
     win = PersonelListesiPenceresi()
     win.show()
     sys.exit(app.exec())

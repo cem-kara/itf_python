@@ -175,7 +175,7 @@ class KayitWorker(QThread):
                 rapor_araci = RaporYoneticisi(sablon_klasoru)
                 
                 context = {
-                    'AD_SOYAD': ad_soyad,
+                    'Ad_Soyad': ad_soyad,
                     'Kimlik_No': tc_no,
                     'Hizmet_sinifi': self.data.get('hizmet_sinifi'),
                     'Kadro_Unvani': self.data.get('kadro_unvani'),
