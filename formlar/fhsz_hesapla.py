@@ -194,7 +194,7 @@ class FHSZHesaplamaPenceresi(QWidget):
         
         hl.addWidget(QLabel("Dönem Yılı:"))
         by = datetime.now().year
-        self.cmb_yil = OrtakAraclar.create_combo_box(ff, [str(y) for y in range(by-3, by+3)]); self.cmb_yil.setCurrentText(str(by)); self.cmb_yil.setFixedWidth(100); hl.addWidget(self.cmb_yil)
+        self.cmb_yil = OrtakAraclar.create_combo_box(ff, [str(y) for y in range(by-5, by+5)]); self.cmb_yil.setCurrentText(str(by)); self.cmb_yil.setFixedWidth(100); hl.addWidget(self.cmb_yil)
         
         hl.addWidget(QLabel("Dönem Ayı:"))
         aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
@@ -241,8 +241,15 @@ class FHSZHesaplamaPenceresi(QWidget):
                 # Kolon temizliği
                 self.df_personel.columns = [c.strip() for c in self.df_personel.columns]
                 
+                # 🟢 HATA DÜZELTMESİ BURADA:
+                # Ad Soyad ve Kimlik sütunlarını kesin olarak metne (str) çeviriyoruz.
+                # Böylece sıralama yaparken int/str hatası vermez.
+                if 'Ad_Soyad' in self.df_personel.columns:
+                    self.df_personel['Ad_Soyad'] = self.df_personel['Ad_Soyad'].fillna("").astype(str)
+
                 if 'Kimlik_No' in self.df_personel.columns:
                     self.df_personel['Kimlik_No'] = self.df_personel['Kimlik_No'].astype(str).apply(lambda x: x.split('.')[0] if x else "0")
+                
                 if 'Gorev_Yeri' in self.df_personel.columns:
                     self.df_personel['Gorev_Yeri'] = self.df_personel['Gorev_Yeri'].fillna("").astype(str)
 
