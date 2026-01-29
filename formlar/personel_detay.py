@@ -23,6 +23,7 @@ if root_dir not in sys.path:
 
 # --- PROJE MODÜLLERİ ---
 try:
+    from araclar.log_yonetimi import LogYoneticisi
     from araclar.yetki_yonetimi import YetkiYoneticisi
     from araclar.ortak_araclar import (
         OrtakAraclar, pencereyi_kapat, show_info, show_error, show_question,
@@ -84,7 +85,7 @@ class GuncelleWorker(QThread):
         self.files = dosya_yollari 
         self.links = mevcut_linkler 
         self.drive_ids = drive_ids
-        self.pasife_al = pasife_al # Yeni parametre: İşten çıkış mı?
+        self.pasife_al = pasife_al 
 
     def run(self):
         temp_files_to_delete = [] 
@@ -94,9 +95,7 @@ class GuncelleWorker(QThread):
                 try: drive = GoogleDriveService()
                 except: pass
 
-            # ---------------------------------------------------------
             # 1. RESİM HAZIRLIĞI
-            # ---------------------------------------------------------
             resim_yolu_for_word = None
             if self.files.get("Resim") and os.path.exists(self.files["Resim"]):
                 resim_yolu_for_word = self.files["Resim"]
@@ -125,16 +124,13 @@ class GuncelleWorker(QThread):
                     if self.files.get("Resim"): self.files["Resim"] = safe_resim_path
                 except: pass
 
-            # ---------------------------------------------------------
-            # 2. DOSYA YÜKLEME (YENİLER İÇİN ESKİLERİ SİLEREK)
-            # ---------------------------------------------------------
+            # 2. DOSYA YÜKLEME
             if drive:
                 id_resim = self.drive_ids.get("Personel_Resim", "")
                 id_diploma = self.drive_ids.get("Personel_Diploma", "")
                 
                 for key, path in self.files.items():
                     if path and os.path.exists(path):
-                        # Eskiyi Sil
                         eski_link = self.links.get(key)
                         if eski_link:
                             try:
@@ -144,7 +140,6 @@ class GuncelleWorker(QThread):
                                     except: pass
                             except: pass
 
-                        # Yeniyi Yükle
                         hedef_id = id_resim if key == "Resim" else id_diploma
                         if hedef_id:
                             _, uzanti = os.path.splitext(path)
@@ -157,11 +152,8 @@ class GuncelleWorker(QThread):
                                 if link: self.links[key] = link
                             except Exception as e: print(f"Upload hatası: {e}")
 
-            # ---------------------------------------------------------
             # 3. WORD OLUŞTURMA
-            # ---------------------------------------------------------
             try:
-                # Eski Word'ü Sil
                 eski_ozluk_link = self.links.get("OzlukDosyasi")
                 if drive and eski_ozluk_link and hasattr(drive, 'service'):
                     try:
@@ -171,10 +163,9 @@ class GuncelleWorker(QThread):
                             except: pass
                     except: pass
 
-                # Yeni Word'ü Oluştur
                 sablon_klasoru = os.path.join(root_dir, "sablonlar")
                 rapor_araci = RaporYoneticisi(sablon_klasoru)
-                context = self.data.copy() # Form verilerini kopyala
+                context = self.data.copy() 
                 context['Kimlik_No'] = self.tc
                 context['Olusturma_Tarihi'] = QDate.currentDate().toString("dd.MM.yyyy")
                 
@@ -194,25 +185,16 @@ class GuncelleWorker(QThread):
                     if os.path.exists(cikti_yolu): os.remove(cikti_yolu)
             except: traceback.print_exc()
 
-            # ---------------------------------------------------------
-            # 4. PASİFE ALMA İŞLEMLERİ (DRIVE TAŞIMA & İZİN SIFIRLAMA)
-            # ---------------------------------------------------------
+            # 4. PASİFE ALMA
             durum_text = "Aktif"
             if self.pasife_al:
                 durum_text = "Pasif"
-                # A) İzin Sıfırlama
                 try:
                     ws_izin = veritabani_getir('personel', 'izin_bilgi')
                     cell = ws_izin.find(self.tc)
-                    if cell:
-                        # K Sütunu (11. Sütun) = Sua_Cari_Yil_Kazanim -> 0 yap
-                        # Eğer sütun yapısı değişirse burası patlayabilir, header kontrolü eklenebilir.
-                        # Şimdilik standart yapıya (K sütunu) göre işlem yapıyoruz.
-                        ws_izin.update_cell(cell.row, 11, 0) 
-                        print("Pasif personel cari izin kazanımı sıfırlandı.")
+                    if cell: ws_izin.update_cell(cell.row, 11, 0) 
                 except Exception as e: print(f"İzin sıfırlama hatası: {e}")
 
-                # B) Dosya Taşıma (Eski_Personeller Klasörüne)
                 if drive and hasattr(drive, 'service'):
                     arsiv_id = self.drive_ids.get("Eski_Personeller", "")
                     if arsiv_id:
@@ -221,28 +203,16 @@ class GuncelleWorker(QThread):
                             try:
                                 fid = self._get_file_id_from_link(link)
                                 if fid:
-                                    # Mevcut parentları bul
                                     f = drive.service.files().get(fileId=fid, fields='parents').execute()
                                     prev_parents = ",".join(f.get('parents'))
-                                    # Taşı
-                                    drive.service.files().update(
-                                        fileId=fid, 
-                                        addParents=arsiv_id, 
-                                        removeParents=prev_parents,
-                                        supportsAllDrives=True
-                                    ).execute()
-                                    print(f"{k} dosyası arşive taşındı.")
+                                    drive.service.files().update(fileId=fid, addParents=arsiv_id, removeParents=prev_parents, supportsAllDrives=True).execute()
                             except Exception as e: print(f"Dosya taşıma hatası ({k}): {e}")
 
-            # ---------------------------------------------------------
-            # 5. VERİTABANI GÜNCELLEME (PERSONEL SAYFASI)
-            # ---------------------------------------------------------
+            # 5. VERİTABANI
             ws = veritabani_getir('personel', 'Personel')
             cell = ws.find(self.tc)
             if not cell: raise Exception("Personel bulunamadı.")
             
-            # Veri listesini oluştur (Sütun sırasına dikkat!)
-            # 0:TC ... 23:Durum, 24:AyrilisTarihi, 25:AyrilisNedeni
             guncel_satir = [
                 self.tc, self.data.get('ad_soyad', ''),
                 self.data.get('dogum_yeri', ''), self.data.get('dogum_tarihi', ''),
@@ -256,12 +226,10 @@ class GuncelleWorker(QThread):
                 self.data.get('diploma_no2', ''), 
                 self.links.get('Resim', ''), self.links.get('Diploma1', ''), 
                 self.links.get('Diploma2', ''), self.links.get('OzlukDosyasi', ''), 
-                durum_text, # Sütun 24 (X) -> Durum
-                self.data.get('ayrilis_tarihi', ''), # Sütun 25 (Y) -> Ayrılış Tarihi
-                self.data.get('ayrilma_nedeni', '')  # Sütun 26 (Z) -> Ayrılma Nedeni
+                durum_text, 
+                self.data.get('ayrilis_tarihi', ''), 
+                self.data.get('ayrilma_nedeni', '')
             ]
-            
-            # Satırı güncelle (A'dan Z'ye kadar, 26 Sütun)
             ws.update(f"A{cell.row}:Z{cell.row}", [guncel_satir])
             self.islem_tamam.emit()
 
@@ -342,7 +310,6 @@ class PersonelDetayPenceresi(QWidget):
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
         
-        # ÜST BAR
         top_bar = QHBoxLayout()
         self.lbl_baslik = QLabel(f"👤 {self.personel_data[1]}")
         self.lbl_baslik.setStyleSheet("font-size: 20px; font-weight: bold; color: #4dabf7;")
@@ -353,7 +320,6 @@ class PersonelDetayPenceresi(QWidget):
         top_bar.addWidget(self.btn_duzenle); top_bar.addWidget(self.btn_kaydet); top_bar.addWidget(self.btn_iptal)
         main_layout.addLayout(top_bar)
         
-        # TABS
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane { border: 1px solid #3e3e3e; border-radius: 5px; }
@@ -386,7 +352,7 @@ class PersonelDetayPenceresi(QWidget):
         main_h_layout.setContentsMargins(10, 10, 10, 10)
         
         # =========================================================
-        # SOL SÜTUN: KİMLİK KARTI (DÜZELTİLDİ)
+        # SOL SÜTUN: KİMLİK KARTI (SADELEŞTİRİLMİŞ YAPI)
         # =========================================================
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
@@ -396,40 +362,36 @@ class PersonelDetayPenceresi(QWidget):
         grp_kimlik = OrtakAraclar.create_group_box(content_widget, "Kimlik Bilgileri")
         grp_kimlik.setStyleSheet("QGroupBox{font-weight:bold; border:1px solid #444; border-radius:8px; margin-top:10px;} QGroupBox::title{subcontrol-origin: margin; left: 10px; color:#4dabf7;}")
         
+        # Tek bir dikey layout kullanıyoruz, karmaşayı önlemek için
         v_kimlik = QVBoxLayout(grp_kimlik)
-        v_kimlik.setSpacing(15)
+        v_kimlik.setSpacing(12) 
         v_kimlik.setContentsMargins(15, 25, 15, 15)
         
-        # 1. Fotoğraf Alanı (Yatayda ve Dikeyde Ortalı)
-        img_layout_wrapper = QHBoxLayout()
-        img_layout_wrapper.addStretch()
-        
-        v_img_inner = QVBoxLayout()
-        v_img_inner.setSpacing(8)
-        
+        # 1. FOTOĞRAF (Direkt Layout'a ekle ve ortala)
         self.lbl_resim = QLabel("Fotoğraf Yok")
         self.lbl_resim.setFixedSize(150, 170)
         self.lbl_resim.setStyleSheet("border: 2px solid #555; background: #222; border-radius: 8px;")
         self.lbl_resim.setAlignment(Qt.AlignCenter)
         self.lbl_resim.setScaledContents(True)
         
-        self.btn_resim_degis = OrtakAraclar.create_button(grp_kimlik, "📷 Değiştir", lambda: self._dosya_sec("Resim"))
+        # Qt.AlignCenter ile ekleyince ortada durur
+        v_kimlik.addWidget(self.lbl_resim, 0, Qt.AlignCenter)
+        
+        # 2. DEĞİŞTİR BUTONU
+        self.btn_resim_degis = OrtakAraclar.create_button(grp_kimlik, "📷 Fotoğrafı Değiştir", lambda: self._dosya_sec("Resim"))
         self.btn_resim_degis.setFixedWidth(150)
-        self.btn_resim_degis.setStyleSheet("background-color: #333; font-size: 11px; padding: 4px;")
+        self.btn_resim_degis.setStyleSheet("background-color: #333; font-size: 11px; padding: 5px; border-radius: 4px;")
         
-        v_img_inner.addWidget(self.lbl_resim)
-        v_img_inner.addWidget(self.btn_resim_degis)
+        v_kimlik.addWidget(self.btn_resim_degis, 0, Qt.AlignCenter)
         
-        img_layout_wrapper.addLayout(v_img_inner)
-        img_layout_wrapper.addStretch()
-        
-        v_kimlik.addLayout(img_layout_wrapper)
-        
-        # Ayırıcı
-        line = QFrame(); line.setFrameShape(QFrame.HLine); line.setFrameShadow(QFrame.Sunken); line.setStyleSheet("background-color: #444;")
+        # Ayırıcı Çizgi
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        line.setStyleSheet("background-color: #444; margin-top: 5px; margin-bottom: 5px;")
         v_kimlik.addWidget(line)
 
-        # 2. Temel Bilgiler
+        # 3. KİMLİK BİLGİLERİ (Alt alta sıralı)
         self.ui['tc'] = self._create_input_with_label(grp_kimlik, "TC Kimlik No:")
         self.ui['tc'].setReadOnly(True)
         self.ui['tc'].setStyleSheet("color: #aaa; background-color: #2b2b2b; font-weight: bold;")
@@ -439,7 +401,7 @@ class PersonelDetayPenceresi(QWidget):
         self.ui['ad_soyad'].setStyleSheet("font-weight: bold; font-size: 13px;")
         v_kimlik.addWidget(self.ui['ad_soyad'].parentWidget())
         
-        # 3. Doğum Bilgileri (Yan Yana)
+        # 4. DOĞUM BİLGİLERİ (Yan Yana)
         h_dogum = QHBoxLayout()
         h_dogum.setSpacing(10)
         
@@ -454,12 +416,13 @@ class PersonelDetayPenceresi(QWidget):
         
         v_kimlik.addLayout(h_dogum)
         
-        v_kimlik.addStretch() # Aşağıyı boş bırak
+        v_kimlik.addStretch() # Kalan boşluğu altta topla
+        
         left_layout.addWidget(grp_kimlik)
-        main_h_layout.addWidget(left_container, 3)
+        main_h_layout.addWidget(left_container, 3) # Sol sütun genişlik oranı: 3
 
         # =========================================================
-        # SAĞ SÜTUN: DETAYLAR (İLETİŞİM, KADRO, EĞİTİM, ÇIKIŞ)
+        # SAĞ SÜTUN: DETAYLAR (İLETİŞİM, KADRO, EĞİTİM)
         # =========================================================
         right_container = QWidget()
         right_layout = QVBoxLayout(right_container)
@@ -469,7 +432,10 @@ class PersonelDetayPenceresi(QWidget):
         
         # 1. İLETİŞİM
         grp_iletisim = OrtakAraclar.create_group_box(content_widget, "İletişim Bilgileri")
-        h_iletisim = QHBoxLayout(grp_iletisim); h_iletisim.setSpacing(15); h_iletisim.setContentsMargins(15, 25, 15, 15)
+        h_iletisim = QHBoxLayout(grp_iletisim)
+        h_iletisim.setSpacing(15)
+        h_iletisim.setContentsMargins(15, 25, 15, 15)
+        
         self.ui['cep_tel'] = self._create_input_with_label(grp_iletisim, "Cep Telefonu:")
         self.ui['eposta'] = self._create_input_with_label(grp_iletisim, "E-Posta Adresi:")
         h_iletisim.addWidget(self.ui['cep_tel'].parentWidget())
@@ -478,7 +444,9 @@ class PersonelDetayPenceresi(QWidget):
 
         # 2. KADRO
         grp_kadro = OrtakAraclar.create_group_box(content_widget, "Kadro ve Kurumsal Bilgiler")
-        v_kadro = QVBoxLayout(grp_kadro); v_kadro.setSpacing(15); v_kadro.setContentsMargins(15, 25, 15, 15)
+        v_kadro = QVBoxLayout(grp_kadro)
+        v_kadro.setSpacing(15)
+        v_kadro.setContentsMargins(15, 25, 15, 15)
         
         row_k1 = QHBoxLayout()
         self.ui['hizmet_sinifi'] = self._create_combo_no_label(grp_kadro)
@@ -491,6 +459,7 @@ class PersonelDetayPenceresi(QWidget):
         self.ui['sicil_no'] = OrtakAraclar.create_line_edit(grp_kadro)
         self.ui['baslama_tarihi'] = QDateEdit(); self.ui['baslama_tarihi'].setCalendarPopup(True); self.ui['baslama_tarihi'].setDisplayFormat("dd.MM.yyyy")
         self.ui['gorev_yeri'] = self._create_combo_no_label(grp_kadro)
+        
         row_k2.addWidget(self._wrap_label_widget("Kurum Sicil No:", self.ui['sicil_no']), 1)
         row_k2.addWidget(self._wrap_label_widget("Başlama Tarihi:", self.ui['baslama_tarihi']), 1)
         row_k2.addWidget(self._wrap_label_widget("Görev Yeri:", self.ui['gorev_yeri']), 2)
@@ -507,14 +476,20 @@ class PersonelDetayPenceresi(QWidget):
         v_edu1 = QVBoxLayout(); v_edu1.setSpacing(10)
         lbl_edu1 = QLabel("1. Mezuniyet / Eğitim"); lbl_edu1.setStyleSheet("color:#4dabf7; font-weight:bold; border-bottom:1px solid #444; padding-bottom:3px;")
         v_edu1.addWidget(lbl_edu1)
-        self.ui['okul1'] = self._create_editable_combo(grp_egitim); v_edu1.addWidget(self._wrap_label_widget("Okul:", self.ui['okul1']))
-        self.ui['fakulte1'] = self._create_editable_combo(grp_egitim); v_edu1.addWidget(self._wrap_label_widget("Bölüm / Fakülte:", self.ui['fakulte1']))
+        
+        self.ui['okul1'] = self._create_editable_combo(grp_egitim)
+        v_edu1.addWidget(self._wrap_label_widget("Okul:", self.ui['okul1']))
+        
+        self.ui['fakulte1'] = self._create_editable_combo(grp_egitim)
+        v_edu1.addWidget(self._wrap_label_widget("Bölüm / Fakülte:", self.ui['fakulte1']))
+        
         h_dip1 = QHBoxLayout()
         self.ui['mezun_tarihi1'] = OrtakAraclar.create_line_edit(grp_egitim); self.ui['mezun_tarihi1'].setInputMask("99.99.9999")
         self.ui['diploma_no1'] = OrtakAraclar.create_line_edit(grp_egitim)
         h_dip1.addWidget(self._wrap_label_widget("Mez. Tar:", self.ui['mezun_tarihi1']))
         h_dip1.addWidget(self._wrap_label_widget("Dip. No:", self.ui['diploma_no1']))
         v_edu1.addLayout(h_dip1)
+        
         h_btn1 = QHBoxLayout()
         self.btn_view_dip1 = OrtakAraclar.create_button(grp_egitim, "👁️ Görüntüle", lambda: self._dosya_ac("Diploma1"))
         self.btn_up_dip1 = OrtakAraclar.create_button(grp_egitim, "📤 Yükle", lambda: self._dosya_sec("Diploma1"))
@@ -523,20 +498,27 @@ class PersonelDetayPenceresi(QWidget):
         h_egitim_main.addLayout(v_edu1)
         
         # --- DİKEY AYRAÇ ---
-        line_v = QFrame(); line_v.setFrameShape(QFrame.VLine); line_v.setStyleSheet("background-color: #444;"); h_egitim_main.addWidget(line_v)
+        line_v = QFrame(); line_v.setFrameShape(QFrame.VLine); line_v.setStyleSheet("background-color: #444;")
+        h_egitim_main.addWidget(line_v)
         
         # --- SAĞ EĞİTİM SÜTUNU ---
         v_edu2 = QVBoxLayout(); v_edu2.setSpacing(10)
         lbl_edu2 = QLabel("2. Mezuniyet / Eğitim"); lbl_edu2.setStyleSheet("color:#4dabf7; font-weight:bold; border-bottom:1px solid #444; padding-bottom:3px;")
         v_edu2.addWidget(lbl_edu2)
-        self.ui['okul2'] = self._create_editable_combo(grp_egitim); v_edu2.addWidget(self._wrap_label_widget("Okul:", self.ui['okul2']))
-        self.ui['fakulte2'] = self._create_editable_combo(grp_egitim); v_edu2.addWidget(self._wrap_label_widget("Bölüm / Fakülte:", self.ui['fakulte2']))
+        
+        self.ui['okul2'] = self._create_editable_combo(grp_egitim)
+        v_edu2.addWidget(self._wrap_label_widget("Okul:", self.ui['okul2']))
+        
+        self.ui['fakulte2'] = self._create_editable_combo(grp_egitim)
+        v_edu2.addWidget(self._wrap_label_widget("Bölüm / Fakülte:", self.ui['fakulte2']))
+        
         h_dip2 = QHBoxLayout()
         self.ui['mezun_tarihi2'] = OrtakAraclar.create_line_edit(grp_egitim); self.ui['mezun_tarihi2'].setInputMask("99.99.9999")
         self.ui['diploma_no2'] = OrtakAraclar.create_line_edit(grp_egitim)
         h_dip2.addWidget(self._wrap_label_widget("Mez. Tar:", self.ui['mezun_tarihi2']))
         h_dip2.addWidget(self._wrap_label_widget("Dip. No:", self.ui['diploma_no2']))
         v_edu2.addLayout(h_dip2)
+        
         h_btn2 = QHBoxLayout()
         self.btn_view_dip2 = OrtakAraclar.create_button(grp_egitim, "👁️ Görüntüle", lambda: self._dosya_ac("Diploma2"))
         self.btn_up_dip2 = OrtakAraclar.create_button(grp_egitim, "📤 Yükle", lambda: self._dosya_sec("Diploma2"))
@@ -545,31 +527,9 @@ class PersonelDetayPenceresi(QWidget):
         h_egitim_main.addLayout(v_edu2)
 
         right_layout.addWidget(grp_egitim)
-
-        # 4. İŞTEN ÇIKIŞ PANELİ
-        grp_cikis = QGroupBox("⚠️ İşten Çıkış İşlemleri")
-        grp_cikis.setStyleSheet("QGroupBox{border:1px solid #ff6b6b; border-radius:8px; margin-top:10px; background-color:#2b1b1b;} QGroupBox::title{color:#ff6b6b; font-weight:bold;}")
-        h_cikis = QHBoxLayout(grp_cikis); h_cikis.setSpacing(15); h_cikis.setContentsMargins(15, 20, 15, 15)
-        
-        self.ui['ayrilis_tarihi'] = QDateEdit(); self.ui['ayrilis_tarihi'].setCalendarPopup(True); self.ui['ayrilis_tarihi'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['ayrilis_tarihi'].setDate(QDate.currentDate())
-        self.ui['ayrilma_nedeni'] = OrtakAraclar.create_line_edit(grp_cikis, "Örn: İstifa, Tayin...")
-        
-        self.btn_pasif = QPushButton("Personeli Pasife Al")
-        self.btn_pasif.setStyleSheet("background-color:#c92a2a; color:white; font-weight:bold; padding:8px; border-radius:4px;")
-        self.btn_pasif.setCursor(Qt.PointingHandCursor)
-        self.btn_pasif.clicked.connect(self._isten_cikar_tiklandi)
-        self.btn_pasif.setVisible(False) 
-        self.ui['btn_pasif'] = self.btn_pasif 
-
-        h_cikis.addWidget(self._wrap_label_widget("Ayrılış Tarihi:", self.ui['ayrilis_tarihi']))
-        h_cikis.addWidget(self._wrap_label_widget("Ayrılma Nedeni:", self.ui['ayrilma_nedeni']))
-        h_cikis.addWidget(self.btn_pasif)
-        right_layout.addWidget(grp_cikis)
-
         right_layout.addStretch() # Sağ tarafı yukarı itele
         
-        main_h_layout.addWidget(right_container, 7)
+        main_h_layout.addWidget(right_container, 7) # Sağ sütun genişlik oranı: 7
         
         scroll.setWidget(content_widget)
         layout.addWidget(scroll)
@@ -601,6 +561,27 @@ class PersonelDetayPenceresi(QWidget):
         grp_diger = QGroupBox("⚠️ Diğer"); grp_diger.setStyleSheet("border:1px solid #555; border-radius:8px;")
         v_diger = QVBoxLayout(grp_diger); self.lbl_rapor_toplam = self._create_info_row(v_diger, "Toplam Rapor:")
         grid.addWidget(grp_diger, 1, 0, 1, 2)
+        
+        # 🔴 İŞTEN ÇIKIŞ BURAYA TAŞINDI
+        grp_cikis = QGroupBox("⚠️ İşten Çıkış İşlemleri")
+        grp_cikis.setStyleSheet("QGroupBox{border:1px solid #ff6b6b; border-radius:8px; margin-top:20px; background-color:#2b1b1b;} QGroupBox::title{color:#ff6b6b; font-weight:bold;}")
+        h_cikis = QHBoxLayout(grp_cikis); h_cikis.setSpacing(15); h_cikis.setContentsMargins(15, 20, 15, 15)
+        
+        self.ui['ayrilis_tarihi'] = QDateEdit(); self.ui['ayrilis_tarihi'].setCalendarPopup(True); self.ui['ayrilis_tarihi'].setDisplayFormat("dd.MM.yyyy")
+        self.ui['ayrilis_tarihi'].setDate(QDate.currentDate())
+        self.ui['ayrilma_nedeni'] = OrtakAraclar.create_line_edit(grp_cikis, "Örn: İstifa, Tayin...")
+        self.btn_pasif = QPushButton("Personeli Pasife Al")
+        self.btn_pasif.setStyleSheet("background-color:#c92a2a; color:white; font-weight:bold; padding:8px; border-radius:4px;")
+        self.btn_pasif.setCursor(Qt.PointingHandCursor)
+        self.btn_pasif.clicked.connect(self._isten_cikar_tiklandi)
+        self.btn_pasif.setVisible(False) 
+        self.ui['btn_pasif'] = self.btn_pasif 
+
+        h_cikis.addWidget(self._wrap_label_widget("Ayrılış Tarihi:", self.ui['ayrilis_tarihi']))
+        h_cikis.addWidget(self._wrap_label_widget("Ayrılma Nedeni:", self.ui['ayrilma_nedeni']))
+        h_cikis.addWidget(self.btn_pasif)
+        
+        grid.addWidget(grp_cikis, 2, 0, 1, 2) # En alta boydan boya
         
         layout.addWidget(self.izin_content); layout.addStretch()
 
@@ -722,9 +703,17 @@ class PersonelDetayPenceresi(QWidget):
             else: d[k] = ""
         self.worker = GuncelleWorker(self.ui['tc'].text(), d, self.dosya_yollari, self.mevcut_linkler, self.drive_config, pasife_al)
         self.worker.islem_tamam.connect(self._on_success); self.worker.hata_olustu.connect(self._on_error); self.worker.start()
-
+        
     def _on_success(self):
         self.progress.setVisible(False); self.btn_kaydet.setEnabled(True)
+        # --- LOGLAMA KODU BURAYA GELECEK ---
+        LogYoneticisi.log_ekle(
+            modul="Personel",
+            islem="Güncelleme",
+            detay=" adlı personelin bilgileri güncellendi.",
+            kullanici=YetkiYoneticisi.kullanici_adi
+        )
+        # -----------------------------------
         show_info("Başarılı", "İşlem Tamamlandı.", self); self._mod_degistir(False); self.veri_guncellendi.emit()
 
     def _on_error(self, e):

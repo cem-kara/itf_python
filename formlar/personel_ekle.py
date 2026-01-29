@@ -23,6 +23,7 @@ if root_dir not in sys.path:
 
 # --- PROJE MODÜLLERİ ---
 try:
+    from araclar.log_yonetimi import LogYoneticisi
     from araclar.yetki_yonetimi import YetkiYoneticisi
     from araclar.ortak_araclar import (
         OrtakAraclar, pencereyi_kapat, show_info, show_error, 
