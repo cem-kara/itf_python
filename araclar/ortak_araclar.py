@@ -14,14 +14,97 @@ from typing import Dict, List, Any
 from PySide6.QtWidgets import (
     QWidget, QGroupBox, QFormLayout, QLineEdit, QComboBox, 
     QDateEdit, QMessageBox, QMdiSubWindow, QVBoxLayout, 
-    QTableWidget, QHeaderView, QPushButton,
+    QTableWidget, QHeaderView, QPushButton,QFrame,QApplication,
     QLabel, QHBoxLayout, QAbstractItemView, QMdiArea
 )
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QIntValidator
+from PySide6.QtCore import QDate, Qt, QTimer, QPropertyAnimation,QPoint,QEasingCurve
+from PySide6.QtGui import QIntValidator,QColor
 
-# Loglama Ayarı
+# Loglama Ayarı (Mevcut yapı korundu)
 logger = logging.getLogger("OrtakAraclar")
+# ============================================================================
+# NEW: TOAST NOTIFICATION SYSTEM
+# ============================================================================
+
+class ToastWidget(QFrame):
+    """Ekranın köşesinde geçici bildirim gösteren widget."""
+    def __init__(self, text, parent=None, duration=3000, color="#323232"):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        
+        # Stil Ayarları
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {color};
+                color: white;
+                border-radius: 10px;
+                padding: 10px;
+            }}
+            QLabel {{ color: white; font-size: 12px; font-weight: bold; }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        self.label = QLabel(text)
+        layout.addWidget(self.label)
+        
+        # Zamanlayıcı (Otomatik Kapanma)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.fade_out)
+        self.duration = duration
+
+    def show_toast(self):
+        self.setWindowOpacity(0.0)
+        self.show()
+        
+        # Giriş Animasyonu
+        self.anim = QPropertyAnimation(self, b"windowOpacity")
+        self.anim.setDuration(500)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(0.9)
+        self.anim.start()
+        
+        self.timer.start(self.duration)
+
+    def fade_out(self):
+        self.anim = QPropertyAnimation(self, b"windowOpacity")
+        self.anim.setDuration(500)
+        self.anim.setStartValue(0.9)
+        self.anim.setEndValue(0.0)
+        self.anim.finished.connect(self.close)
+        self.anim.start()
+
+def show_toast(message: str, type: str = "info", duration: int = 3000):
+    """
+    Kullanıcıya toast mesajı gösterir.
+    Tipler: 'info' (gri), 'success' (yeşil), 'error' (kırmızı)
+    """
+    colors = {
+        "info": "#323232",
+        "success": "#2D8A2D",
+        "error": "#D32F2F"
+    }
+    color = colors.get(type, "#323232")
+    
+    # Ana ekranın sağ alt köşesini hesapla
+    screen = QApplication.primaryScreen().geometry()
+    toast = ToastWidget(message, color=color, duration=duration)
+    toast.adjustSize()
+    
+    x = screen.width() - toast.width() - 20
+    y = screen.height() - toast.height() - 50
+    toast.move(x, y)
+    
+    toast.show_toast()
+    logger.info(f"Toast Bildirimi ({type}): {message}")
+
+# ============================================================================
+# MEVCUT FONKSİYONLAR (SIFIR SİLME YASASI - KORUNDU)
+# ============================================================================
+
+def show_info(title: str, message: str, parent=None):
+    QMessageBox.information(parent, title, message)
+
 
 # ============================================================================
 # 1. PENCERE YÖNETİMİ
@@ -30,6 +113,9 @@ logger = logging.getLogger("OrtakAraclar")
 def pencereyi_kapat(widget_self):
     """MDI uyumlu pencere kapatma."""
     try:
+        if not widget_self:
+            return
+            
         parent = widget_self.parent()
         while parent:
             if isinstance(parent, QMdiSubWindow):
@@ -38,8 +124,8 @@ def pencereyi_kapat(widget_self):
             parent = parent.parent()
         widget_self.close()
     except Exception as e:
-        logger.error(f"Pencere kapatma hatası: {e}")
-        widget_self.close()
+        # İyileştirme: Hata detayı artırıldı
+        logger.error(f"Pencere kapatılırken beklenmedik hata: {str(e)}", exc_info=True)
 
 def mdi_pencere_ac(mevcut_widget, hedef_form, baslik):
     """
@@ -244,6 +330,12 @@ def show_warning(title: str, message: str, parent=None):
 def show_error(title: str, message: str, parent=None):
     QMessageBox.critical(parent, title, message)
 
+def show_confirmation(title: str, message: str, parent=None) -> bool:
+    """Evet/Hayır sorusu sorar. Evet ise True döner."""
+    reply = QMessageBox.question(parent, title, message, 
+                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+    return reply == QMessageBox.Yes
+
 # EKLENEN FONKSİYON: show_question
 def show_question(title: str, message: str, parent=None) -> bool:
     """Evet/Hayır sorusu sorar. Evet ise True döner."""
@@ -252,26 +344,30 @@ def show_question(title: str, message: str, parent=None) -> bool:
     return reply == QMessageBox.Yes
 
 def validate_required_fields(fields_dict_or_list: Any) -> bool:
-    """Hem sözlük (eski) hem liste (yeni) formatını destekler."""
-    if isinstance(fields_dict_or_list, list):
-        for widget in fields_dict_or_list:
-            if isinstance(widget, QLineEdit):
-                if not widget.text().strip():
-                    show_warning("Eksik Bilgi", f"Lütfen zorunlu alanları doldurunuz.\n(Boş alan: {widget.placeholderText() or 'Belirtilmemiş'})")
-                    widget.setFocus()
-                    return False
-            elif isinstance(widget, QComboBox):
-                if widget.currentIndex() == -1 or not widget.currentText() or widget.currentText() == "Seçiniz...":
-                    show_warning("Eksik Bilgi", "Lütfen bir seçim yapınız.")
-                    widget.setFocus()
-                    return False
-        return True
+    """Hem sözlük hem liste formatını destekler. Boş alan kontrolü yapar."""
+    try:
+        if isinstance(fields_dict_or_list, list):
+            for widget in fields_dict_or_list:
+                if isinstance(widget, QLineEdit):
+                    if not widget.text().strip():
+                        show_warning("Eksik Bilgi", f"Lütfen zorunlu alanları doldurunuz.\n(Boş alan: {widget.placeholderText() or 'Belirtilmemiş'})")
+                        widget.setFocus()
+                        return False
+                elif isinstance(widget, QComboBox):
+                    if widget.currentIndex() == -1 or not widget.currentText() or widget.currentText() == "Seçiniz...":
+                        show_warning("Eksik Bilgi", "Lütfen bir seçim yapınız.")
+                        widget.setFocus()
+                        return False
+            return True
 
-    elif isinstance(fields_dict_or_list, dict):
-        for field_name, value in fields_dict_or_list.items():
-            if not value or str(value).strip() == "":
-                show_warning("Eksik Bilgi", f"Lütfen '{field_name}' alanını doldurunuz.")
-                return False
-        return True
+        elif isinstance(fields_dict_or_list, dict):
+            for field_name, value in fields_dict_or_list.items():
+                if not value or str(value).strip() == "":
+                    show_warning("Eksik Bilgi", f"Lütfen '{field_name}' alanını doldurunuz.")
+                    return False
+            return True
+    except Exception as e:
+        logger.error(f"Doğrulama işlemi sırasında hata: {e}")
+        return False
     
-    return True
+    return False

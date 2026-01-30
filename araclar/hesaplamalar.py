@@ -1,7 +1,11 @@
-# -*- coding: utf-8 -*-
 import numpy as np
 import bisect
+import logging # ZORUNLU EKLEME
 from datetime import timedelta
+
+# Logger tanımı (Standart teknik ekleme)
+logger = logging.getLogger(__name__)
+
 
 # --- YARDIMCI METİN FONKSİYONLARI ---
 def tr_upper(text):

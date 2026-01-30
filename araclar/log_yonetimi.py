@@ -2,8 +2,12 @@
 import sys
 import os
 import threading
+import logging # STANDART EKLEME
 from datetime import datetime
 from google_baglanti import veritabani_getir
+
+# Standart Python Logger Tanımı
+logger = logging.getLogger(__name__)
 
 class LogYoneticisi:
     """
@@ -23,9 +27,13 @@ class LogYoneticisi:
         - kullanici: İşlemi yapan kişi
         """
         # İşlemi ayrı bir thread'de başlat (UI donmasın)
-        t = threading.Thread(target=LogYoneticisi._log_gonder_thread, args=(modul, islem, detay, kullanici))
-        t.daemon = True # Ana program kapanınca bu da kapansın
-        t.start()
+        try:
+            t = threading.Thread(target=LogYoneticisi._log_gonder_thread, args=(modul, islem, detay, kullanici))
+            t.daemon = True # Ana program kapanınca bu da kapansın
+            t.start()
+        except Exception as e:
+            # Thread başlatma hatası çok nadirdir ama yakalanmalıdır
+            logger.critical(f"Log thread'i baslatilamadi: {e}")
 
     @staticmethod
     def _log_gonder_thread(modul, islem, detay, kullanici):
@@ -47,8 +55,9 @@ class LogYoneticisi:
             row = [tarih, saat, kullanici, modul, islem, detay]
             ws.append_row(row)
             
-            print(f"LOG KAYDEDİLDİ: {detay}")
+            # Print yerine standart logger kullanıldı
+            logger.info(f"BULUT LOG KAYDEDİLDİ: {modul} - {islem}")
             
         except Exception as e:
-            # Loglama hatası programı durdurmamalı, sadece konsola yazsın
-            print(f"LOG HATA: {e}")
+            # Loglama hatası programı durdurmamalı
+            logger.error(f"GOOGLE SHEETS LOG YAZMA HATASI: {e}")

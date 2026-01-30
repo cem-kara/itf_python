@@ -18,6 +18,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.auth.exceptions import TransportError, RefreshError
 
+# Yeni Standartlar: Toast bildirimi
+from araclar.ortak_araclar import show_toast
+
 # Loglama Ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("GoogleService")
@@ -50,8 +53,7 @@ class VeritabaniBulunamadiHatasi(GoogleServisHatasi):
 # 2. HATA BİLDİRİM SİNYALCISI (Singleton)
 # =============================================================================
 class GoogleBaglantiSinyalleri(QObject):
-    """Backend hatalarını UI tarafına sinyal olarak göndermek için köprü."""
-    hata_olustu = Signal(str, str) # (Baslik, Mesaj)
+    hata_olustu = Signal(str, str) 
 
     _instance = None
     @classmethod
@@ -81,7 +83,6 @@ def internet_kontrol():
     Kurumsal ağlarda 8.8.8.8:53 engellenebileceği için bu yöntem daha güvenilirdir.
     """
     try:
-        # Standart bir sunucuya port 80 (HTTP) üzerinden bağlanmayı dene
         host = "www.google.com"
         port = 80
         socket.create_connection((host, port), timeout=3)
@@ -142,10 +143,10 @@ def _get_sheets_client():
     """Gspread istemcisini (client) tekil (singleton) olarak döndürür."""
     global _sheets_client
     
-    # İnternet kontrolü (Performans için her çağrıda değil, sadece bağlantı yoksa yapılabilir ama burada güvenlik öncelikli)
     if not internet_kontrol():
-         # UI'ya sinyal gönder
+        # Sinyal gönderilirken Toast ile kullanıcıya da bilgi veriliyor
         GoogleBaglantiSinyalleri.get_instance().hata_olustu.emit("Bağlantı Hatası", "İnternet bağlantısı algılanamadı.")
+        show_toast("İnternet bağlantısı yok!", type="error")
         raise InternetBaglantiHatasi("İnternet bağlantısı yok.")
 
     if not _sheets_client:
@@ -155,6 +156,7 @@ def _get_sheets_client():
         except Exception as e:
             msg = f"Google Sheets yetkilendirme hatası: {str(e)}"
             logger.error(msg)
+            show_toast("Kimlik doğrulama başarısız!", type="error")
             raise KimlikDogrulamaHatasi(msg)
             
     return _sheets_client
@@ -196,30 +198,19 @@ def veritabani_getir(vt_tipi: str, sayfa_adi: str):
             raise ValueError(f"'{vt_tipi}' için veritabanı tanımı bulunamadı.")
 
         # 2. Dosyayı Aç
-        try:
-            sh = client.open(spreadsheet_name)
-        except gspread.SpreadsheetNotFound:
-            raise VeritabaniBulunamadiHatasi(f"'{spreadsheet_name}' isimli Google Sheet dosyası bulunamadı (Yetkiniz olmayabilir).")
-
-        # 3. Sayfayı (Tab) Aç
-        try:
-            ws = sh.worksheet(sayfa_adi)
-            return ws
-        except gspread.WorksheetNotFound:
-            raise VeritabaniBulunamadiHatasi(f"'{spreadsheet_name}' içinde '{sayfa_adi}' sayfası bulunamadı.")
+        sh = client.open(spreadsheet_name) # spreadsheet_name DB_CONFIG'den gelir
+        ws = sh.worksheet(sayfa_adi)
+        return ws
 
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Veritabanı Hatası ({vt_tipi}/{sayfa_adi}): {error_msg}")
         
-        # UI'ya sinyal gönder (Opsiyonel: Kullanıcıya popup açılmasını tetikler)
-        # Eğer bu fonksiyon bir Thread içinde çağrılıyorsa, Thread zaten exception'ı yakalayacaktır.
-        # Ancak yine de global loga düşürmek iyidir.
         if "internet" in error_msg.lower():
+             show_toast("Bağlantı koptu!", type="error")
              raise InternetBaglantiHatasi("İnternet bağlantısı koptu.")
         
-        # Orijinal hatayı yukarı fırlat ki çağıran form (ör: CihazEkle) bunu yakalasın
-        raise e 
+        raise e
 
 # =============================================================================
 # 6. GOOGLE DRIVE SERVİSİ
@@ -234,10 +225,9 @@ class GoogleDriveService:
             raise GoogleServisHatasi(f"Drive bağlantı hatası: {e}")
 
     def upload_file(self, file_path: str, parent_folder_id: str = None, custom_name: str = None) -> Optional[str]:
-        """Dosyayı Drive'a yükler ve link döner. Hata olursa None dönmez, hata fırlatır."""
         if not os.path.exists(file_path):
-            logger.warning(f"Yüklenecek dosya bulunamadı: {file_path}")
-            return None # Dosya yoksa None dönmesi mantıklı, sistem hatası değil.
+            logger.warning(f"Dosya yok: {file_path}")
+            return None
 
         try:
             path_obj = Path(file_path)
@@ -263,12 +253,12 @@ class GoogleDriveService:
                 body={'role': 'reader', 'type': 'anyone'}
             ).execute()
             
+            show_toast("Dosya Drive'a yüklendi", type="success")
             return file.get('webViewLink')
 
         except Exception as e:
             logger.error(f"Drive yükleme hatası: {e}")
-            if not internet_kontrol():
-                raise InternetBaglantiHatasi("Dosya yüklenirken internet bağlantısı kesildi.")
+            show_toast("Dosya yüklenemedi!", type="error")
             raise GoogleServisHatasi(f"Dosya yüklenemedi: {e}")
 
 if __name__ == "__main__":

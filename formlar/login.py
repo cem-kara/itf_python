@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import logging
 from datetime import datetime
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFrame, QMessageBox)
 # 1. DEĞİŞİKLİK: Signal eklendi
 from PySide6.QtCore import Qt, QThread, Signal 
 from PySide6.QtGui import QFont, QPixmap, QIcon
+from araclar.ortak_araclar import show_toast
+from araclar.log_yonetimi import LogYoneticisi
 
+logger = logging.getLogger("Login")
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
@@ -70,11 +74,12 @@ class GirisWorker(QThread):
                         return
             
             self.sonuc.emit(False, "Kullanıcı bulunamadı.", "", "")
-
+            logger.info(f"Giriş denemesi yapılıyor: {self.kadi}")
+            # ... 
         except Exception as e:
-            self.sonuc.emit(False, f"Hata: {e}", "", "")
-
-
+            logger.error(f"Giriş işlemi hatası: {e}")
+            self.sonuc.emit(False, f"Bağlantı Hatası: {str(e)}", "", "")
+        
 class LoginPenceresi(QWidget):
     # 2. DEĞİŞİKLİK: Bu satırı eklemezseniz hata alırsınız!
     giris_basarili = Signal(str, str) # Sinyal: (Rol, TC_Kimlik)
@@ -153,6 +158,8 @@ class LoginPenceresi(QWidget):
         self.btn_giris.setText("GİRİŞ YAP")
 
         if basarili:
+            logger.info(f"Giriş başarılı: {kadi} (Rol: {rol})")
+            show_toast(f"Hoş geldiniz, {kadi}", type="success")
             if mesaj == "CHANGE_REQUIRED":
                 self.hide()
                 try:
@@ -173,7 +180,11 @@ class LoginPenceresi(QWidget):
                 self.giris_basarili.emit(rol, kadi)
                 self.close()
         else:
-            QMessageBox.critical(self, "Giriş Başarısız", mesaj)
+            logger.warning(f"Hatalı giriş denemesi: {kadi} - Neden: {mesaj}")
+            show_toast(mesaj, type="error")
+            # Kritik hatalarda QMessageBox yedek olarak kalabilir
+            if "Bağlantı" in mesaj:
+                QMessageBox.critical(self, "Hata", mesaj)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

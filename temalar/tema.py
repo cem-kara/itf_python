@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import logging
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QPalette, QColor
 from PySide6.QtCore import Qt
+logger = logging.getLogger("TemaYonetimi")
+
 
 class TemaYonetimi:
     """
@@ -11,7 +14,7 @@ class TemaYonetimi:
     
     # Tema Renk Paleti (Win11 Design System)
     RENKLER = {
-        'arka_plan': '#1c1c1c',           # Ana zemin (daha derin)
+        'arka_plan': '#1c1c1c',           # Ana zemin
         'panel': '#2d2d2d',               # Kartlar/Paneller
         'panel_hover': '#343434',         # Hover durumu
         'input_bg': '#1e1e1e',            # Input arka planları
@@ -36,23 +39,25 @@ class TemaYonetimi:
         'kenarlık': '#3e3e3e',            # Genel kenarlıklar
         'kenarlık_acik': '#4d4d4d',       # Açık kenarlık
         'ayirici': '#333333',             # Bölücü çizgiler
+
+        # --- TOAST BİLDİRİM RENKLERİ (Yeni Standart) ---
+        'toast_bilgi': '#323232',
+        'toast_basari': '#2D8A2D',
+        'toast_hata': '#D32F2F',
+        'toast_metin': '#ffffff'
     }
+    
     
     @staticmethod
     def uygula_fusion_dark(app: QApplication):
-        """
-        Uygulamaya Windows 11 Fusion Dark temasını uygular.
-        
-        Parametre:
-        app (QApplication): Qt uygulama örneği
-        """
-        app.setStyle("Fusion")
-        
-        # QPalette ayarları
-        TemaYonetimi._palette_ayarla(app)
-        
-        # Stylesheet uygula
-        app.setStyleSheet(TemaYonetimi._css_olustur())
+        """Uygulamaya Windows 11 Fusion Dark temasını güvenli şekilde uygular."""
+        try:
+            app.setStyle("Fusion")
+            TemaYonetimi._palette_ayarla(app)
+            app.setStyleSheet(TemaYonetimi._css_olustur())
+            logger.info("Win11 Dark Teması başarıyla uygulandı.")
+        except Exception as e:
+            logger.error(f"Tema uygulanırken hata: {e}")
     
     @staticmethod
     def _palette_ayarla(app: QApplication):
@@ -60,7 +65,6 @@ class TemaYonetimi:
         r = TemaYonetimi.RENKLER
         palet = QPalette()
         
-        # Genel zemin ve metin
         palet.setColor(QPalette.Window, QColor(r['arka_plan']))
         palet.setColor(QPalette.WindowText, QColor(r['metin']))
         palet.setColor(QPalette.Base, QColor(r['input_bg']))
@@ -68,18 +72,13 @@ class TemaYonetimi:
         palet.setColor(QPalette.ToolTipBase, QColor(r['panel']))
         palet.setColor(QPalette.ToolTipText, QColor(r['metin']))
         palet.setColor(QPalette.Text, QColor(r['metin']))
-        
-        # Butonlar
         palet.setColor(QPalette.Button, QColor(r['panel']))
         palet.setColor(QPalette.ButtonText, QColor(r['metin']))
-        
-        # Vurgu ve bağlantılar
         palet.setColor(QPalette.Link, QColor(r['vurgu']))
         palet.setColor(QPalette.LinkVisited, QColor(r['vurgu_koyu']))
         palet.setColor(QPalette.Highlight, QColor(r['secim_bg']))
         palet.setColor(QPalette.HighlightedText, QColor('#ffffff'))
         
-        # Pasif durumlar
         palet.setColor(QPalette.Disabled, QPalette.Text, QColor(r['metin_pasif']))
         palet.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(r['metin_pasif']))
         palet.setColor(QPalette.Disabled, QPalette.WindowText, QColor(r['metin_pasif']))
@@ -94,12 +93,19 @@ class TemaYonetimi:
         return f"""
         /* ==================== GENEL AYARLAR ==================== */
         QWidget {{
-            font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, system-ui, sans-serif;
+            font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif;
             font-size: 10pt;
             selection-background-color: {r['secim_bg']};
             selection-color: #ffffff;
         }}
         
+        /* Toast Bildirim Widget Stili (ZORUNLU EKLEME) */
+        ToastWidget {{
+            background-color: {r['toast_bilgi']};
+            border: 1px solid {r['input_border']};
+            border-radius: 10px;
+        }}
+
         QMainWindow, QDialog, QMdiArea {{
             background-color: {r['arka_plan']};
         }}
@@ -696,5 +702,12 @@ class TemaYonetimi:
         QAbstractSpinBox::up-arrow, QAbstractSpinBox::down-arrow {{
             width: 8px;
             height: 8px;
+        }}
+        QPushButton {{
+            background-color: {r['panel']};
+            border: 1px solid {r['kenarlık']};
+            border-radius: 4px;
+            padding: 7px 16px;
+            color: {r['metin']};
         }}
         """

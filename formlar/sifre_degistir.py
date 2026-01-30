@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import logging
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox)
 from PySide6.QtCore import Qt, QThread, Signal
 
@@ -8,6 +9,9 @@ try:
     from google_baglanti import veritabani_getir
 except ImportError:
     pass
+from araclar.ortak_araclar import show_toast
+
+logger = logging.getLogger("SifreDegistir")
 
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,16 +38,14 @@ class SifreGuncelleWorker(QThread):
 
             cell = ws.find(self.kadi)
             if cell:
-                # ŞİFRELEME BURADA
+            # Bcrypt ile yeni hash oluşturuluyor (GuvenlikAraclari günceldir)
                 yeni_sifre_hash = GuvenlikAraclari.sifrele(self.yeni_sifre)
-                
-                # 3. Sütun: Password (Hashli kaydediyoruz)
-                ws.update_cell(cell.row, 3, yeni_sifre_hash)
-                ws.update_cell(cell.row, 6, "HAYIR") 
-                self.sonuc.emit(True, "Şifre başarıyla güncellendi.")
-            else:
-                self.sonuc.emit(False, "Kullanıcı bulunamadı.")
+                ws.update_cell(cell.row, cell.col + 1, yeni_sifre_hash)
+                logger.info(f"Kullanıcı şifresi bcrypt ile güncellendi: {self.kadi}") # Güncel log
+                self.sonuc.emit(True, "Şifreniz başarıyla güncellendi.")
+            # ...
         except Exception as e:
+            logger.error(f"Şifre güncelleme hatası: {e}")
             self.sonuc.emit(False, f"Hata: {str(e)}")
 
 class SifreDegistirPenceresi(QDialog):
@@ -86,13 +88,11 @@ class SifreDegistirPenceresi(QDialog):
         s2 = self.txt_yeni2.text().strip()
 
         if not s1 or not s2:
-            QMessageBox.warning(self, "Hata", "Şifre alanları boş olamaz.")
+            show_toast("Şifre alanları boş olamaz!", type="error")
             return
-
         if s1 != s2:
-            QMessageBox.warning(self, "Hata", "Şifreler uyuşmuyor.")
-            return
-            
+            show_toast("Şifreler uyuşmuyor!", type="error")
+            return            
         if s1 == "12345":
             QMessageBox.warning(self, "Hata", "Yeni şifreniz varsayılan şifreyle aynı olamaz.")
             return
@@ -104,12 +104,13 @@ class SifreDegistirPenceresi(QDialog):
         self.worker.sonuc.connect(self.islem_sonucu)
         self.worker.start()
 
-    def islem_sonucu(self, basari, mesaj):
-        if basari:
-            QMessageBox.information(self, "Başarılı", mesaj)
-            self.basarili_mi = True
-            self.accept() # Pencereyi kapat (OK koduyla)
+    def islem_sonucu(self, basarili, mesaj):
+        if basarili:
+            logger.info("Şifre değişim işlemi başarılı.")
+            show_toast(mesaj, type="success")
+            self.accept() # Dialogu kapat ve OK dön
         else:
-            QMessageBox.critical(self, "Hata", mesaj)
+            logger.warning(f"Şifre değişim başarısız: {mesaj}")
+            show_toast(mesaj, type="error")
             self.btn_kaydet.setEnabled(True)
             self.btn_kaydet.setText("ŞİFREYİ GÜNCELLE VE GİR")

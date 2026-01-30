@@ -23,20 +23,11 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 # --- İMPORTLAR ---
-try:
-    from formlar.login import LoginPenceresi
-except ImportError:
-    pass 
-
 from araclar.yetki_yonetimi import YetkiYoneticisi
-
-# --- MODÜLER IMPORTLAR ---
-try:
-    from temalar.tema import TemaYonetimi
-    from araclar.ortak_araclar import pencereyi_kapat
-except ImportError as e:
-    logger.critical(f"Temel modüller eksik: {e}")
-    sys.exit(1)
+from araclar.ortak_araclar import pencereyi_kapat, show_toast # show_toast eklendi
+from google_baglanti import GoogleBaglantiSinyalleri # Sinyalci eklendi
+from temalar.tema import TemaYonetimi
+from formlar.login import LoginPenceresi    
 
 # =============================================================================
 # KONFİGÜRASYON YÜKLEYİCİ
@@ -79,7 +70,9 @@ class AnaPencere(QMainWindow):
         self.status_bar.showMessage(f"Hoşgeldiniz: {self.kullanici_adi} ({self.yetki})")
 
         # --- YETKİ KURALINI UYGULA ---
-        YetkiYoneticisi.uygula(self, "main_window")
+        YetkiYoneticisi.form_yetkilerini_uygul(self, "main_window")
+        # Google Bağlantı Sinyallerini Dinle
+        GoogleBaglantiSinyalleri.get_instance().hata_olustu.connect(self._google_hatasi_yakala)
 
     def _setup_ui(self):
         """Ana pencere düzeni: Sol Akordeon Menü + Sağ MDI Alanı"""
@@ -223,6 +216,20 @@ class AnaPencere(QMainWindow):
         except Exception as e:
             logger.error(f"Beklenmeyen hata ({baslik}): {e}")
             QMessageBox.critical(self, "Sistem Hatası", f"Beklenmedik bir hata oluştu:\n{str(e)}")
+    
+    def _google_hatasi_yakala(self, baslik, mesaj):
+        """Google servislerinden gelen hataları Toast olarak gösterir."""
+        logger.error(f"Google Bağlantı Hatası: {baslik} - {mesaj}")
+        show_toast(f"{baslik}: {mesaj}", type="error", duration=5000)
+
+    def form_ac(self, modül_adi, sinif_adi, baslik):
+        """Mevcut form_ac metodunu Toast ile modernize edin."""
+        try:
+            # ... (mevcut yükleme kodları) ...
+            logger.info(f"Form açıldı: {baslik}")
+            show_toast(f"{baslik} yüklendi", type="info") # Bilgi bildirimi
+        except Exception as e:
+            self.hata_mesaji_goster(f"{baslik} açılırken hata", e)
 
 # -----------------------------------------------------------------------------
 # PROGRAM YÖNETİCİSİ
@@ -250,7 +257,14 @@ class ProgramYoneticisi:
         except Exception as e:
             QMessageBox.critical(None, "Hata", f"Ana pencere yüklenemedi:\n{e}")
             sys.exit(1)
+    def hata_mesaji_goster(self, baslik, e):
+        error_text = str(e)
+        logger.error(f"{baslik}: {error_text}", exc_info=True)
+        # Kritik hatalarda QMessageBox kalabilir, ancak yanına Toast ekleyelim
+        show_toast("Bir hata oluştu!", type="error")
+        QMessageBox.critical(self, baslik, f"İşlem sırasında bir hata oluştu:\n{error_text}")
 
+        
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
