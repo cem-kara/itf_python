@@ -1,83 +1,81 @@
-# araclar/validators.py (YENİ)
+# -*- coding: utf-8 -*-
 import re
-from typing import Tuple
 
-class Dogrulayicilar:
-    
+class Validator:
+    """
+    Veri doğrulama işlemlerini yürüten yardımcı sınıf.
+    Statik metodlar içerir, doğrudan çağrılabilir.
+    """
+
     @staticmethod
-    def tc_kimlik_dogrula(tc: str) -> Tuple[bool, str]:
+    def validate_tc(tc_no: str) -> tuple[bool, str]:
         """
-        TC Kimlik numarası algoritması ile doğrulama
-        Returns: (geçerli_mi, hata_mesaji)
+        TC Kimlik Numarası algoritma ve biçim kontrolü.
+        Return: (Geçerli_Mi, Hata_Mesajı)
         """
-        tc = tc.strip()
+        if not tc_no:
+            return False, "TC Kimlik Numarası boş olamaz."
         
-        # Uzunluk kontrolü
-        if len(tc) != 11:
-            return False, "TC Kimlik 11 haneli olmalıdır"
+        if not tc_no.isdigit():
+            return False, "TC Kimlik Numarası sadece rakamlardan oluşmalıdır."
         
-        # Sadece rakam kontrolü
-        if not tc.isdigit():
-            return False, "Sadece rakam içermelidir"
+        if len(tc_no) != 11:
+            return False, "TC Kimlik Numarası 11 haneli olmalıdır."
         
-        # İlk hane 0 olamaz
-        if tc[0] == '0':
-            return False, "İlk hane 0 olamaz"
-        
-        # Algoritma kontrolü
-        digits = [int(d) for d in tc]
-        
-        # 10. hane kontrolü
-        sum_odd = sum(digits[0:9:2])  # 1,3,5,7,9
-        sum_even = sum(digits[1:9:2])  # 2,4,6,8
-        if ((sum_odd * 7) - sum_even) % 10 != digits[9]:
-            return False, "Geçersiz TC Kimlik numarası"
-        
-        # 11. hane kontrolü
-        if sum(digits[0:10]) % 10 != digits[10]:
-            return False, "Geçersiz TC Kimlik numarası"
-        
-        return True, "Geçerli"
-    
+        if tc_no[0] == '0':
+            return False, "TC Kimlik Numarası 0 ile başlayamaz."
+            
+        # Algoritma Kontrolü
+        try:
+            digits = [int(d) for d in tc_no]
+            d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11 = digits
+            
+            # 10. Hane: ((Tekler * 7) - Çiftler) % 10
+            odd_sum = d1 + d3 + d5 + d7 + d9
+            even_sum = d2 + d4 + d6 + d8
+            check_10 = ((odd_sum * 7) - even_sum) % 10
+            
+            # 11. Hane: (İlk 10 hane toplamı) % 10
+            check_11 = sum(digits[:10]) % 10
+            
+            if check_10 != d10 or check_11 != d11:
+                return False, "Geçersiz TC Kimlik Numarası (Algoritma Hatası)."
+        except:
+            return False, "TC Kimlik doğrulama sırasında hata oluştu."
+            
+        return True, ""
+
     @staticmethod
-    def telefon_dogrula(tel: str) -> Tuple[bool, str]:
-        """0555 123 45 67 veya 05551234567 formatı"""
-        tel = re.sub(r'[^\d]', '', tel)  # Sadece rakamları al
+    def validate_phone(phone: str) -> tuple[bool, str]:
+        """
+        Türk Telefon Numarası kontrolü.
+        Kabul edilen formatlar: 05XX... veya 5XX... (10 veya 11 hane)
+        """
+        if not phone:
+            return True, "" # Zorunlu değilse boş geçebilir
+            
+        # Sadece rakamları al
+        clean_phone = re.sub(r'[^0-9]', '', phone) 
         
-        if len(tel) not in [10, 11]:
-            return False, "Telefon 10-11 haneli olmalı"
-        
-        if len(tel) == 11 and not tel.startswith('0'):
-            return False, "11 haneli telefon 0 ile başlamalı"
-        
-        if len(tel) == 10:
-            tel = '0' + tel
-        
-        # Başlangıç kontrolü (Türkiye operatörleri)
-        if not tel[1:4] in ['505', '506', '507', '530', '531', '532', '533', 
-                            '534', '535', '536', '537', '538', '539', '541', 
-                            '542', '543', '544', '545', '546', '547', '548', 
-                            '549', '551', '552', '553', '554', '555', '559']:
-            return False, "Geçersiz operatör kodu"
-        
-        return True, tel  # Temizlenmiş format döndür
-    
+        if len(clean_phone) == 11 and clean_phone.startswith('05'):
+            return True, ""
+        elif len(clean_phone) == 10 and clean_phone.startswith('5'):
+            return True, ""
+        else:
+            return False, "Telefon numarası '05XX ...' formatında olmalıdır."
+
     @staticmethod
-    def email_dogrula(email: str) -> Tuple[bool, str]:
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    def validate_email(email: str) -> tuple[bool, str]:
+        """
+        Standart E-posta format kontrolü.
+        """
+        if not email:
+            return True, ""
+            
+        # Basit ve etkili regex deseni
+        pattern = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        
         if re.match(pattern, email):
-            return True, email.lower()
-        return False, "Geçersiz e-posta formatı"
-
-# Kullanım:
-class PersonelEkle(QWidget):
-    def kaydet(self):
-        tc = self.txt_tc.text()
-        gecerli, mesaj = Dogrulayicilar.tc_kimlik_dogrula(tc)
-        
-        if not gecerli:
-            show_error("Hata", mesaj, self)
-            self.txt_tc.setFocus()
-            return
-        
-        # Devam et...
+            return True, ""
+        else:
+            return False, "Geçersiz E-posta adresi formatı."

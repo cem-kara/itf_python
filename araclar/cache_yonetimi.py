@@ -1,96 +1,80 @@
-# araclar/cache_yonetimi.py (YENİ DOSYA)
+# -*- coding: utf-8 -*-
+import threading
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Any, Dict
-import threading
+
+# Loglama
+logger = logging.getLogger("CacheYonetimi")
 
 class VeritabaniOnbellegi:
     """
-    Thread-safe, TTL destekli önbellek sistemi.
-    Redis benzeri ancak local hafıza tabanlı.
+    Thread-safe, TTL (Time-To-Live) destekli önbellek sistemi.
+    Verileri belirli bir süre (varsayılan 5 dk) hafızada tutar.
     """
     
-    def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
+    _instance = None
+    _lock = threading.RLock()
+
+    def __new__(cls):
+        """Singleton Pattern: Tek bir önbellek örneği oluşturur."""
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super(VeritabaniOnbellegi, cls).__new__(cls)
+                    cls._instance._init_cache()
+        return cls._instance
+
+    def _init_cache(self):
+        self._cache: Dict[str, Any] = {}
         self._ttl_cache: Dict[str, datetime] = {}
-        self._lock = threading.RLock()
-    
+        # Cache erişimi için ayrı kilit (Singleton kilidiyle karışmasın)
+        self._data_lock = threading.RLock()
+
     def get(self, key: str) -> Optional[Any]:
-        """Önbellekten veri al. TTL dolmuşsa None döner."""
-        with self._lock:
+        """Önbellekten veri çeker. Süresi dolmuşsa None döner."""
+        with self._data_lock:
             if key not in self._cache:
                 return None
             
-            # TTL kontrolü
+            # Süre kontrolü
             if key in self._ttl_cache:
                 if datetime.now() > self._ttl_cache[key]:
-                    # Süresi dolmuş
-                    del self._cache[key]
-                    del self._ttl_cache[key]
+                    logger.debug(f"Cache expired: {key}")
+                    self.invalidate(key) # Temizle
                     return None
             
+            logger.debug(f"Cache HIT: {key}")
             return self._cache[key]
-    
+
     def set(self, key: str, value: Any, ttl_seconds: int = 300):
-        """Veriyi önbelleğe al. Varsayılan TTL: 5 dakika"""
-        with self._lock:
+        """Veriyi önbelleğe yazar."""
+        with self._data_lock:
             self._cache[key] = value
             self._ttl_cache[key] = datetime.now() + timedelta(seconds=ttl_seconds)
-    
+            logger.debug(f"Cache SET: {key} (TTL: {ttl_seconds}s)")
+
     def invalidate(self, key: str):
-        """Belirli bir anahtarı geçersiz kıl"""
-        with self._lock:
+        """Belirli bir anahtarı siler."""
+        with self._data_lock:
             self._cache.pop(key, None)
             self._ttl_cache.pop(key, None)
-    
+
     def invalidate_pattern(self, pattern: str):
-        """Belirli bir pattern'e uyan tüm anahtarları temizle"""
-        with self._lock:
+        """İsim desenine uyan (örn: 'personel:') tüm kayıtları siler."""
+        with self._data_lock:
             keys_to_remove = [k for k in self._cache.keys() if pattern in k]
-            for key in keys_to_remove:
-                self._cache.pop(key, None)
-                self._ttl_cache.pop(key, None)
-    
-    def clear(self):
-        """Tüm önbelleği temizle"""
-        with self._lock:
+            for k in keys_to_remove:
+                self.invalidate(k)
+            if keys_to_remove:
+                logger.info(f"Cache pattern '{pattern}' cleaned ({len(keys_to_remove)} items).")
+
+    def clear_all(self):
+        """Tüm önbelleği temizler."""
+        with self._data_lock:
             self._cache.clear()
             self._ttl_cache.clear()
+            logger.warning("All cache cleared.")
 
-# Global singleton instance
-_cache_instance = VeritabaniOnbellegi()
-
-def get_cache() -> VeritabaniOnbellegi:
-    return _cache_instance
-
-
-# google_baglanti.py içinde kullanım:
-def veritabani_getir_cached(vt_tipi: str, sayfa_adi: str, use_cache=True):
-    """Önbellek destekli veritabanı getirme"""
-    cache_key = f"{vt_tipi}:{sayfa_adi}"
-    
-    if use_cache:
-        cached_data = get_cache().get(cache_key)
-        if cached_data:
-            logger.info(f"✅ Cache HIT: {cache_key}")
-            return cached_data
-    
-    logger.info(f"❌ Cache MISS: {cache_key} - Veritabanından çekiliyor...")
-    ws = veritabani_getir(vt_tipi, sayfa_adi)
-    data = ws.get_all_records()
-    
-    # Cache'e kaydet (5 dakika TTL)
-    get_cache().set(cache_key, data, ttl_seconds=300)
-    
-    return data
-
-# Form içinde kullanım:
-class PersonelListesiPenceresi(QWidget):
-    def veri_yukle(self):
-        # Cache kullanarak veri çek
-        personeller = veritabani_getir_cached('personel', 'Personel', use_cache=True)
-        self.tabloyu_doldur(personeller)
-    
-    def yeni_personel_eklendi(self):
-        # Veri değişti, cache'i temizle
-        get_cache().invalidate('personel:Personel')
-        self.veri_yukle()  # Yeniden yükle
+# Global erişim noktası
+cache = VeritabaniOnbellegi()

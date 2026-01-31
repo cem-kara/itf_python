@@ -6,14 +6,14 @@ import traceback
 from typing import Optional
 
 # PySide6 Kütüphaneleri
-from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QDate, QThread, Signal, QRegularExpression
+from PySide6.QtGui import QPixmap, QIntValidator, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QScrollArea, QFileDialog, QTabWidget, QProgressBar, QFrame,
-    QComboBox, QCompleter, QLineEdit, QDateEdit, QFormLayout, QApplication, QGroupBox
+    QScrollArea, QFileDialog, QProgressBar, QFrame,
+    QComboBox, QCompleter, QLineEdit, QDateEdit, 
+    QApplication, QGroupBox, QMessageBox, QFormLayout
 )
-from PySide6.QtGui import QIntValidator
 
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -26,30 +26,31 @@ try:
     from araclar.log_yonetimi import LogYoneticisi
     from araclar.yetki_yonetimi import YetkiYoneticisi
     from araclar.ortak_araclar import (
-        OrtakAraclar, pencereyi_kapat, show_info, show_error, 
-        validate_required_fields, kayitlari_getir, satir_ekle
+        OrtakAraclar, pencereyi_kapat, show_info, show_error
     )
     from temalar.tema import TemaYonetimi 
     from araclar.rapor_yoneticisi import RaporYoneticisi 
-    from araclar.hata_yonetimi import HataYoneticisi
-    from araclar.validators import Dogrulayicilar
-    from google_baglanti import veritabani_getir_cached, cache_temizle
-
-    from google_baglanti import (
-        veritabani_getir, GoogleDriveService, 
-        InternetBaglantiHatasi, KimlikDogrulamaHatasi
-    )
+    from services.personel_service import PersonelService
     
-    # 🟢 RESİM İŞLEME İÇİN EKLENDİ
+    # Validator Modülü
+    try:
+        from araclar.validators import Validator
+    except ImportError:
+        class Validator:
+            @staticmethod
+            def validate_tc(x): return len(str(x))==11, "TC 11 hane olmalı"
+            @staticmethod
+            def validate_phone(x): return True, ""
+            @staticmethod
+            def validate_email(x): return True, ""
+
     from PIL import Image
     
 except ImportError as e:
     print(f"KRİTİK HATA: Modüller yüklenemedi! {e}")
-    print("Lütfen 'pip install Pillow' komutunu çalıştırın.")
-    GoogleDriveService = None
-    InternetBaglantiHatasi = Exception
-    KimlikDogrulamaHatasi = Exception
+    PersonelService = None
     Image = None
+    Validator = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("PersonelEkle")
@@ -59,514 +60,434 @@ logger = logging.getLogger("PersonelEkle")
 # =============================================================================
 class BaslangicYukleyici(QThread):
     veri_hazir = Signal(dict)
-    
+    def __init__(self, service):
+        super().__init__()
+        self.service = service
+
     def run(self):
-        sonuc_dict = {'Drive_Klasor': {}}
+        sonuc_dict = {}
         try:
-            tum_sabitler = kayitlari_getir(veritabani_getir, 'sabit', 'Sabitler')
-            if tum_sabitler:
-                for satir in tum_sabitler:
-                    kod = str(satir.get('Kod', '')).strip()
-                    eleman = str(satir.get('MenuEleman', '')).strip()
-                    aciklama = str(satir.get('Aciklama', '')).strip() 
-                    
-                    if kod and eleman:
-                        if kod == "Drive_Klasor":
-                            sonuc_dict['Drive_Klasor'][eleman] = aciklama
-                        else:
-                            if kod not in sonuc_dict: sonuc_dict[kod] = []
-                            sonuc_dict[kod].append(eleman)
-            
-            tum_personel = kayitlari_getir(veritabani_getir, 'personel', 'Personel')
-            sehirler, okullar, bolumler = set(), set(), set()
-            
-            if tum_personel:
-                for p in tum_personel:
-                    dy = p.get('Dogum_Yeri')
-                    if dy: sehirler.add(str(dy).strip())
-                    
-                    okul = p.get('Mezun_Olunan_Okul')
-                    if okul: okullar.add(str(okul).strip())
-                    
-                    fak = p.get('Mezun_Olunan_Fakülte')
-                    if fak: bolumler.add(str(fak).strip())
-
-            for k in sonuc_dict:
-                if isinstance(sonuc_dict[k], list): sonuc_dict[k].sort()
-            
-            sonuc_dict['Sehirler'] = sorted(list(sehirler))
-            sonuc_dict['Okullar'] = sorted(list(okullar))
-            sonuc_dict['Bolumler'] = sorted(list(bolumler))
-
-        except Exception as e:
-            logger.error(f"Başlangıç yükleme hatası: {e}")
-            traceback.print_exc()
-        
+            if not self.service: return
+            sonuc_dict['Hizmet_Sinifi'] = self.service.sabit_degerleri_getir('Hizmet_Sinifi')
+            sonuc_dict['Kadro_Unvani'] = self.service.sabit_degerleri_getir('Kadro_Unvani')
+            sonuc_dict['Gorev_Yeri'] = self.service.sabit_degerleri_getir('Gorev_Yeri')
+            sonuc_dict['Sehirler'] = self.service.benzersiz_degerleri_getir('Dogum_Yeri')
+            sonuc_dict['Okullar'] = self.service.benzersiz_degerleri_getir('Mezun_Olunan_Okul')
+            sonuc_dict['Bolumler'] = self.service.benzersiz_degerleri_getir('Mezun_Olunan_Fakülte')
+        except Exception: pass
         self.veri_hazir.emit(sonuc_dict)
 
 # =============================================================================
-# 2. KAYIT İŞÇİSİ (RESİM DÜZELTME ÖZELLİKLİ)
+# 2. KAYIT İŞÇİSİ
 # =============================================================================
 class KayitWorker(QThread):
     islem_tamam = Signal()
     hata_olustu = Signal(str)
     
-    def __init__(self, veri_sozlugu, dosya_yollari, drive_ids):
+    def __init__(self, service, veri_sozlugu, dosya_yollari, kullanici_adi):
         super().__init__()
+        self.service = service
         self.data = veri_sozlugu
         self.files = dosya_yollari
-        self.drive_ids = drive_ids 
+        self.kullanici_adi = kullanici_adi
 
     def run(self):
-        temp_resim_path = None # Geçici dosya takibi için
-        
+        temp_files = [] 
         try:
-            drive_links = {"Resim": "", "Diploma1": "", "Diploma2": "", "OzlukDosyasi": ""}
-            tc_no = self.data.get('tc', '00000000000')
-            ad_soyad = self.data.get('ad_soyad', 'Isimsiz')
-            
-            # 🟢 ADIM 0: RESİM FORMATINI STANDARTLAŞTIRMA (Hata Önleyici)
+            # Resim İşleme
             if self.files.get("Resim") and Image:
                 try:
                     orj_yol = self.files["Resim"]
                     if os.path.exists(orj_yol):
-                        # Resmi aç ve RGB'ye çevir (Word ve Drive için en güvenli format)
                         img = Image.open(orj_yol)
-                        if img.mode in ("RGBA", "P", "CMYK"):
-                            img = img.convert("RGB")
-                        
-                        # Geçici olarak JPG kaydet
+                        if img.mode in ("RGBA", "P", "CMYK"): img = img.convert("RGB")
+                        tc_no = self.data.get('Kimlik_No', 'temp')
                         temp_resim_path = os.path.join(current_dir, f"temp_resim_{tc_no}.jpg")
                         img.save(temp_resim_path, "JPEG", quality=90)
-                        
-                        # Dosya yolunu güncelle (Artık işlemler bu temiz dosyayla yapılacak)
                         self.files["Resim"] = temp_resim_path
-                except Exception as e:
-                    print(f"Resim formatlama uyarısı: {e} (Orijinal dosya kullanılacak)")
+                        temp_files.append(temp_resim_path)
+                except Exception as e: logger.warning(f"Resim hatası: {e}")
 
-            # --- 1. SÜRÜCÜYE BAĞLAN ---
-            drive = None
-            if GoogleDriveService:
-                try:
-                    drive = GoogleDriveService()
-                except Exception as e:
-                    print(f"Drive bağlantı hatası: {e}")
-
-            # --- 2. DOSYA YÜKLEME ---
-            if drive:
-                id_resim = self.drive_ids.get("Personel_Resim", "") 
-                id_diploma = self.drive_ids.get("Personel_Diploma", "")
-
-                for key, path in self.files.items():
-                    if path and os.path.exists(path):
-                        hedef_id = id_resim if key == "Resim" else id_diploma
-                        if hedef_id:
-                            _, uzanti = os.path.splitext(path)
-                            if key == "Resim": yeni_isim = f"{tc_no}_profil{uzanti}"
-                            elif key == "Diploma1": yeni_isim = f"{tc_no}_diploma_1{uzanti}"
-                            elif key == "Diploma2": yeni_isim = f"{tc_no}_diploma_2{uzanti}"
-                            else: yeni_isim = os.path.basename(path)
-
-                            try:
-                                link = drive.upload_file(path, hedef_id, custom_name=yeni_isim)
-                                if link: drive_links[key] = link
-                            except Exception as e:
-                                print(f"Dosya yükleme hatası ({key}): {e}")
-
-            # --- 3. WORD OLUŞTURMA ---
+            # Word Oluşturma
             try:
                 sablon_klasoru = os.path.join(root_dir, "sablonlar")
                 rapor_araci = RaporYoneticisi(sablon_klasoru)
-                
-                context = {
-                    'Ad_Soyad': ad_soyad,
-                    'Kimlik_No': tc_no,
-                    'Hizmet_sinifi': self.data.get('hizmet_sinifi'),
-                    'Kadro_Unvani': self.data.get('kadro_unvani'),
-                    'Memuriyete_Baslama_Tarihi': self.data.get('baslama_tarihi'),
-                    'Kurum_Sicil_No': self.data.get('sicil_no'),
-                    'Gorev_Yeri': self.data.get('gorev_yeri'),
-                    'Dogum_Yeri': self.data.get('dogum_yeri'),
-                    'Dogum_Tarihi': self.data.get('dogum_tarihi'),
-                    'Cep_Telefon': self.data.get('cep_tel'),
-                    'E_posta': self.data.get('eposta'),
-                    'Mezun_Olunan_Okul': self.data.get('okul1'),
-                    'Mezun_Olunan_Fakülte': self.data.get('fakulte1'),
-                    'Mezuniyet_Tarihi': self.data.get('mezun_tarihi1'),
-                    'Diploma_No': self.data.get('diploma_no1'),
-                    'Mezun_Olunan_Okul_2': self.data.get('okul2'),
-                    'Mezun_Olunan_Fakülte_Bolum_2': self.data.get('fakulte2'),
-                    'Mezuniyet_Tarihi_2': self.data.get('mezun_tarihi2'),
-                    'Diploma_No_2': self.data.get('diploma_no2'),
-                    'Olusturma_Tarihi': QDate.currentDate().toString("dd.MM.yyyy")
-                }
-
-                resim_yolu = self.files.get("Resim")
+                context = {k: v for k, v in self.data.items()}
+                context['Olusturma_Tarihi'] = QDate.currentDate().toString("dd.MM.yyyy")
                 resimler = {}
-                if resim_yolu and os.path.exists(resim_yolu):
-                    resimler['Resim'] = os.path.abspath(resim_yolu)
+                if self.files.get("Resim") and os.path.exists(self.files["Resim"]):
+                    resimler['Resim'] = os.path.abspath(self.files["Resim"])
                 
-                cikti_yolu = os.path.join(current_dir, f"{tc_no}_ozluk.docx")
-
-                basari_word = rapor_araci.word_olustur("personel_ozluk_sablon.docx", context, cikti_yolu, resimler)
+                tc_no = self.data.get('Kimlik_No', '000')
+                word_path = os.path.join(current_dir, f"{tc_no}_ozluk.docx")
                 
-                if basari_word and drive:
-                    id_dosyalar = self.drive_ids.get("Personel_Dosyalari", "") or self.drive_ids.get("Personel_Resim", "")
-                    if id_dosyalar:
-                        try:
-                            link = drive.upload_file(cikti_yolu, id_dosyalar, custom_name=f"{tc_no}_{ad_soyad}_Ozluk.docx")
-                            if link: drive_links["OzlukDosyasi"] = link
-                        except Exception as e:
-                            print(f"Word Drive hatası: {e}")
-                    
-                    if os.path.exists(cikti_yolu): os.remove(cikti_yolu)
+                if rapor_araci.word_olustur("personel_ozluk_sablon.docx", context, word_path, resimler):
+                    self.files['Ozluk_Dosyasi'] = word_path
+                    temp_files.append(word_path)
+            except Exception as e: logger.error(f"Word hatası: {e}")
 
-            except Exception as e:
-                print("--- WORD HATASI ---")
-                traceback.print_exc()
-
-            # --- 4. VERİTABANI KAYIT ---
-            row_personel = [
-                self.data.get('tc', ''), self.data.get('ad_soyad', ''),
-                self.data.get('dogum_yeri', ''), self.data.get('dogum_tarihi', ''),
-                self.data.get('hizmet_sinifi', ''), self.data.get('kadro_unvani', ''),
-                self.data.get('gorev_yeri', ''), self.data.get('sicil_no', ''),
-                self.data.get('baslama_tarihi', ''), self.data.get('cep_tel', ''),
-                self.data.get('eposta', ''), self.data.get('okul1', ''),
-                self.data.get('fakulte1', ''), self.data.get('mezun_tarihi1', ''),
-                self.data.get('diploma_no1', ''), self.data.get('okul2', ''),
-                self.data.get('fakulte2', ''), self.data.get('mezun_tarihi2', ''),
-                self.data.get('diploma_no2', ''), 
-                drive_links.get('Resim', ''),
-                drive_links.get('Diploma1', ''), 
-                drive_links.get('Diploma2', ''),
-                drive_links.get('OzlukDosyasi', '') 
-            ]
-
-            basari_vt = satir_ekle(veritabani_getir, 'personel', 'Personel', row_personel)
-            
-            if basari_vt: 
-                try:
-                    row_izin = [
-                        self.data.get('tc', ''), self.data.get('ad_soyad', ''),
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-                    ]
-                    satir_ekle(veritabani_getir, 'personel', 'izin_bilgi', row_izin)
-                except Exception as ex:
-                    print(f"İzin bilgisi hatası: {ex}")
-
-                self.islem_tamam.emit()
-            else: 
-                raise Exception("Veritabanına kayıt yapılamadı.")
-
-        except InternetBaglantiHatasi: self.hata_olustu.emit("İnternet bağlantısı kesildi.")
-        except KimlikDogrulamaHatasi: self.hata_olustu.emit("Oturum zaman aşımı.")
-        except Exception as e: 
-            traceback.print_exc()
-            self.hata_olustu.emit(f"Hata: {str(e)}")
+            # Servis Kaydı
+            basari, mesaj = self.service.personel_ekle(self.data, self.files, self.kullanici_adi)
+            if basari: self.islem_tamam.emit()
+            else: self.hata_olustu.emit(mesaj)
         
+        except Exception as e:
+            self.hata_olustu.emit(f"Kritik Hata: {str(e)}")
         finally:
-            # 🟢 TEMİZLİK: Geçici oluşturulan resim dosyasını sil
-            if temp_resim_path and os.path.exists(temp_resim_path):
-                try: os.remove(temp_resim_path)
-                except: pass
+            for path in temp_files:
+                if os.path.exists(path):
+                    try: os.remove(path)
+                    except: pass
 
 # =============================================================================
 # 3. ANA FORM
 # =============================================================================
 class PersonelEklePenceresi(QWidget):
-    def __init__(self, yetki='viewer', kullanici_adi=None): 
+    def __init__(self, yetki='viewer', kullanici_adi="Sistem"): 
         super().__init__()
         self.yetki = yetki
         self.kullanici_adi = kullanici_adi 
         
-        self.setWindowTitle("Yeni Personel Ekle")
-        self.resize(1300, 850)
-        
+        self.service = PersonelService()
         self.dosya_yollari = {"Resim": None, "Diploma1": None, "Diploma2": None}
-        self.drive_config = {} 
         self.ui = {} 
 
+        self.setWindowTitle("Yeni Personel Ekle")
+        self.resize(1200, 850)
+
         self._setup_ui()
-        YetkiYoneticisi.uygula(self, "personel_ekle")
+        
+        try: YetkiYoneticisi.uygula(self, "personel_ekle")
+        except: pass
+            
         self._baslangic_yukle()
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
-        
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
         
         content_widget = QWidget()
-        columns_layout = QHBoxLayout(content_widget)
-        columns_layout.setSpacing(20)
-        columns_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(25)
 
-        # ================= SOL SÜTUN =================
-        left_layout = QVBoxLayout()
-        left_layout.setAlignment(Qt.AlignTop)
-        left_layout.setSpacing(20)
+        # ==========================================================
+        # 1. BÖLÜM: ÜST ALAN (FOTO | KİMLİK | İLETİŞİM)
+        # ==========================================================
+        top_container = QWidget()
+        top_layout = QHBoxLayout(top_container)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(20)
 
-        # 1. KİMLİK VE FOTOĞRAF
-        grp_kimlik = OrtakAraclar.create_group_box(content_widget, "Kimlik ve Fotoğraf Bilgileri")
-        v_kimlik = QVBoxLayout(grp_kimlik)
-        v_kimlik.setSpacing(15)
+        # --- A. FOTOĞRAF (SOL) ---
+        photo_grp = QGroupBox("Fotoğraf")
+        photo_lay = QVBoxLayout(photo_grp)
+        photo_lay.setAlignment(Qt.AlignCenter)
         
-        # A) Fotoğraf Alanı
-        h_resim = QVBoxLayout() 
-        h_resim.setAlignment(Qt.AlignCenter)
-        self.lbl_resim_onizleme = QLabel("Fotoğraf Yok")
-        self.lbl_resim_onizleme.setFixedSize(140, 160)
-        self.lbl_resim_onizleme.setStyleSheet("border: 2px dashed #555; background: #2b2b2b; color: #aaa; border-radius: 8px;")
+        self.lbl_resim_onizleme = QLabel("Fotoğraf\nYüklenmedi")
+        self.lbl_resim_onizleme.setFixedSize(130, 150)
+        self.lbl_resim_onizleme.setStyleSheet("border: 2px dashed #666; border-radius: 8px; color: #888;")
         self.lbl_resim_onizleme.setAlignment(Qt.AlignCenter)
         self.lbl_resim_onizleme.setScaledContents(True)
-        btn_resim_sec = OrtakAraclar.create_button(grp_kimlik, "📷 Fotoğraf Seç", self._resim_sec)
-        btn_resim_sec.setFixedWidth(140)
-        h_resim.addWidget(self.lbl_resim_onizleme)
-        h_resim.addWidget(btn_resim_sec)
-        v_kimlik.addLayout(h_resim)
         
-        v_kimlik.addSpacing(10)
+        btn_resim = QPushButton("Fotoğraf Seç")
+        btn_resim.setCursor(Qt.PointingHandCursor)
+        btn_resim.clicked.connect(self._resim_sec)
+        
+        photo_lay.addWidget(self.lbl_resim_onizleme)
+        photo_lay.addWidget(btn_resim)
+        
+        # --- B. KİMLİK BİLGİLERİ (ORTA) ---
+        id_grp = QGroupBox("Kimlik Bilgileri")
+        id_lay = QVBoxLayout(id_grp)
+        id_lay.setSpacing(15)
+        id_lay.setContentsMargins(15, 25, 15, 15)
 
-        # B) Kimlik Inputları
-        self.ui['tc'] = self._create_input_with_label(grp_kimlik, "TC Kimlik No:", "11 Haneli TC")
+        # Satır 1: TC ve Ad Soyad
+        row_id_1 = QHBoxLayout()
+        self.ui['tc'] = QLineEdit()
         self.ui['tc'].setMaxLength(11)
-        self.ui['tc'].setValidator(QIntValidator())
-        v_kimlik.addWidget(self.ui['tc'].parentWidget()) 
-
-        self.ui['ad_soyad'] = self._create_input_with_label(grp_kimlik, "Adı Soyadı:")
-        v_kimlik.addWidget(self.ui['ad_soyad'].parentWidget())
-
-        # C) Doğum Yeri ve Tarihi
-        row_dogum = QHBoxLayout()
-        self.ui['dogum_yeri'] = self._create_editable_combo(grp_kimlik)
-        self.ui['dogum_tarihi'] = QDateEdit()
-        self.ui['dogum_tarihi'].setCalendarPopup(True)
-        self.ui['dogum_tarihi'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['dogum_tarihi'].setMinimumHeight(40) 
+        # DÜZELTME: QIntValidator yerine Regex Validator (Sadece rakam, sınır yok)
+        self.ui['tc'].setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]*"))) 
         
-        row_dogum.addWidget(self._wrap_label_widget("Doğum Yeri:", self.ui['dogum_yeri']))
-        row_dogum.addWidget(self._wrap_label_widget("Doğum Tarihi:", self.ui['dogum_tarihi']))
-        v_kimlik.addLayout(row_dogum)
-
-        left_layout.addWidget(grp_kimlik)
-        columns_layout.addLayout(left_layout, 4) 
-
-        # ================= SAĞ SÜTUN =================
-        right_layout = QVBoxLayout()
-        right_layout.setAlignment(Qt.AlignTop)
-        right_layout.setSpacing(20)
-
-        # 2. İLETİŞİM
-        grp_iletisim = OrtakAraclar.create_group_box(content_widget, "İletişim Bilgileri")
-        h_iletisim = QHBoxLayout(grp_iletisim)
-        h_iletisim.setSpacing(15)
+        self.ui['ad_soyad'] = QLineEdit()
         
-        self.ui['cep_tel'] = self._create_input_with_label(grp_iletisim, "Cep Telefonu:", "05XX...")
+        self._add_v_field(row_id_1, "TC Kimlik No (*)", self.ui['tc'])
+        self._add_v_field(row_id_1, "Ad Soyad (*)", self.ui['ad_soyad'])
+        id_lay.addLayout(row_id_1)
+
+        # Satır 2: Doğum Yeri ve Tarihi
+        row_id_2 = QHBoxLayout()
+        self.ui['dogum_yeri'] = self._create_combo(editable=True)
+        self.ui['dogum_tarihi'] = QDateEdit(); self.ui['dogum_tarihi'].setCalendarPopup(True); self.ui['dogum_tarihi'].setDisplayFormat("dd.MM.yyyy")
+        
+        self._add_v_field(row_id_2, "Doğum Yeri", self.ui['dogum_yeri'])
+        self._add_v_field(row_id_2, "Doğum Tarihi", self.ui['dogum_tarihi'])
+        id_lay.addLayout(row_id_2)
+        
+        id_lay.addStretch()
+
+        # --- C. İLETİŞİM BİLGİLERİ (SAĞ) ---
+        contact_grp = QGroupBox("İletişim Bilgileri")
+        contact_lay = QVBoxLayout(contact_grp)
+        contact_lay.setSpacing(15)
+        contact_lay.setContentsMargins(15, 25, 15, 15)
+        
+        self.ui['cep_tel'] = QLineEdit()
+        self.ui['cep_tel'].setPlaceholderText("05XX...")
+        # DÜZELTME: Telefon için de Regex Validator
+        self.ui['cep_tel'].setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]*")))
         self.ui['cep_tel'].setMaxLength(11)
-        self.ui['cep_tel'].setValidator(QIntValidator())
-        h_iletisim.addWidget(self.ui['cep_tel'].parentWidget())
         
-        self.ui['eposta'] = self._create_input_with_label(grp_iletisim, "E-Posta Adresi:")
-        h_iletisim.addWidget(self.ui['eposta'].parentWidget())
+        self.ui['eposta'] = QLineEdit()
         
-        right_layout.addWidget(grp_iletisim)
+        self._add_v_field(contact_lay, "Cep Telefonu", self.ui['cep_tel'])
+        self._add_v_field(contact_lay, "E-Posta Adresi", self.ui['eposta'])
+        contact_lay.addStretch()
 
-        # 3. KADRO
-        grp_kadro = OrtakAraclar.create_group_box(content_widget, "Kadro ve Kurumsal Bilgiler")
-        v_kadro = QVBoxLayout(grp_kadro)
-        v_kadro.setSpacing(15)
+        top_layout.addWidget(photo_grp)
+        top_layout.addWidget(id_grp, stretch=2)
+        top_layout.addWidget(contact_grp, stretch=1)
         
-        row_k1 = QHBoxLayout()
-        self.ui['hizmet_sinifi'] = self._create_combo_no_label(grp_kadro)
-        self.ui['kadro_unvani'] = self._create_combo_no_label(grp_kadro)
-        row_k1.addWidget(self._wrap_label_widget("Hizmet Sınıfı:", self.ui['hizmet_sinifi']))
-        row_k1.addWidget(self._wrap_label_widget("Kadro Ünvanı:", self.ui['kadro_unvani']))
-        v_kadro.addLayout(row_k1)
-        
-        row_k2 = QHBoxLayout()
-        self.ui['sicil_no'] = OrtakAraclar.create_line_edit(grp_kadro)
-        self.ui['baslama_tarihi'] = QDateEdit()
-        self.ui['baslama_tarihi'].setCalendarPopup(True)
-        self.ui['baslama_tarihi'].setDisplayFormat("dd.MM.yyyy")
-        self.ui['baslama_tarihi'].setDate(QDate.currentDate())
-        self.ui['baslama_tarihi'].setMinimumHeight(40)
-        self.ui['gorev_yeri'] = self._create_combo_no_label(grp_kadro)
-        
-        row_k2.addWidget(self._wrap_label_widget("Kurum Sicil No:", self.ui['sicil_no']), 1)
-        row_k2.addWidget(self._wrap_label_widget("Başlama Tarihi:", self.ui['baslama_tarihi']), 0)
-        row_k2.addWidget(self._wrap_label_widget("Görev Yeri:", self.ui['gorev_yeri']), 1)
-        v_kadro.addLayout(row_k2)
-        
-        right_layout.addWidget(grp_kadro)
+        content_layout.addWidget(top_container)
 
-        # 4. EĞİTİM
-        grp_egitim_ana = OrtakAraclar.create_group_box(content_widget, "Eğitim Bilgileri")
-        layout_egitim_ana = QHBoxLayout(grp_egitim_ana)
-        layout_egitim_ana.setContentsMargins(10, 25, 10, 10)
-        layout_egitim_ana.setSpacing(20)
+        # ==========================================================
+        # 2. BÖLÜM: KURUMSAL BİLGİLER
+        # ==========================================================
+        corp_grp = QGroupBox("Kurumsal Bilgiler")
+        corp_lay = QVBoxLayout(corp_grp)
+        corp_lay.setSpacing(15)
+        corp_lay.setContentsMargins(15, 25, 15, 15)
         
-        # Üniversite 1
-        grp_uni1 = QGroupBox("Lise / Lisans / Önlisans")
-        grp_uni1.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: -4px; left: 10px; }")
-        l_uni1 = QVBoxLayout(grp_uni1)
-        self.ui['okul1'] = self._create_editable_combo(grp_uni1)
-        self.ui['fakulte1'] = self._create_editable_combo(grp_uni1)
-        l_uni1.addWidget(self._wrap_label_widget("Okul:", self.ui['okul1']))
-        l_uni1.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte1']))
+        row_corp_1 = QHBoxLayout()
+        self.ui['hizmet_sinifi'] = self._create_combo()
+        self.ui['kadro_unvani'] = self._create_combo()
+        self.ui['gorev_yeri'] = self._create_combo()
         
-        row_u1_2 = QHBoxLayout()
-        self.ui['mezun_tarihi1'] = OrtakAraclar.create_line_edit(grp_uni1)
-        self.ui['mezun_tarihi1'].setInputMask("99.99.9999")
-        self.ui['mezun_tarihi1'].setPlaceholderText("GG.AA.YYYY")
-        self.ui['diploma_no1'] = OrtakAraclar.create_line_edit(grp_uni1)
-        row_u1_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi1']))
-        row_u1_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no1']))
-        l_uni1.addLayout(row_u1_2)
+        self._add_v_field(row_corp_1, "Hizmet Sınıfı (*)", self.ui['hizmet_sinifi'])
+        self._add_v_field(row_corp_1, "Kadro Ünvanı (*)", self.ui['kadro_unvani'])
+        self._add_v_field(row_corp_1, "Görev Yeri", self.ui['gorev_yeri'])
+        corp_lay.addLayout(row_corp_1)
         
-        self.btn_dip1 = OrtakAraclar.create_button(grp_uni1, "📄 Diploma Dosyası Seç", lambda: self._dosya_sec("Diploma1", self.btn_dip1))
-        l_uni1.addWidget(self.btn_dip1)
-        layout_egitim_ana.addWidget(grp_uni1)
+        row_corp_2 = QHBoxLayout()
+        self.ui['sicil_no'] = QLineEdit()
+        self.ui['baslama_tarihi'] = QDateEdit(); self.ui['baslama_tarihi'].setCalendarPopup(True); self.ui['baslama_tarihi'].setDate(QDate.currentDate())
+        
+        self._add_v_field(row_corp_2, "Kurum Sicil No", self.ui['sicil_no'])
+        self._add_v_field(row_corp_2, "Başlama Tarihi", self.ui['baslama_tarihi'])
+        row_corp_2.addStretch() 
+        corp_lay.addLayout(row_corp_2)
+        
+        content_layout.addWidget(corp_grp)
 
-        # Üniversite 2
-        grp_uni2 = QGroupBox("Önlisans / Yüksek Lisans / Lisans Tamamlama")
-        grp_uni2.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; font-weight: bold; } QGroupBox::title { color: #4dabf7; top: -4px; left: 10px; }")
-        l_uni2 = QVBoxLayout(grp_uni2)
-        self.ui['okul2'] = self._create_editable_combo(grp_uni2)
-        self.ui['fakulte2'] = self._create_editable_combo(grp_uni2)
-        l_uni2.addWidget(self._wrap_label_widget("Okul:", self.ui['okul2']))
-        l_uni2.addWidget(self._wrap_label_widget("Bölüm/Fakülte:", self.ui['fakulte2']))
+        # ==========================================================
+        # 3. BÖLÜM: EĞİTİM BİLGİLERİ
+        # ==========================================================
+        edu_grp = QGroupBox("Eğitim Bilgileri")
+        edu_main_lay = QHBoxLayout(edu_grp)
+        edu_main_lay.setSpacing(20)
         
-        row_u2_2 = QHBoxLayout()
-        self.ui['mezun_tarihi2'] = OrtakAraclar.create_line_edit(grp_uni2)
-        self.ui['mezun_tarihi2'].setInputMask("99.99.9999")
-        self.ui['mezun_tarihi2'].setPlaceholderText("GG.AA.YYYY")
-        self.ui['diploma_no2'] = OrtakAraclar.create_line_edit(grp_uni2)
-        row_u2_2.addWidget(self._wrap_label_widget("Mezuniyet Tarihi:", self.ui['mezun_tarihi2']))
-        row_u2_2.addWidget(self._wrap_label_widget("Diploma No:", self.ui['diploma_no2']))
-        l_uni2.addLayout(row_u2_2)
+        # Okul 1
+        edu_1_widget = QWidget()
+        edu_1_lay = QVBoxLayout(edu_1_widget)
+        edu_1_lay.setContentsMargins(0,0,0,0)
         
-        self.btn_dip2 = OrtakAraclar.create_button(grp_uni2, "📄 Diploma Dosyası Seç", lambda: self._dosya_sec("Diploma2", self.btn_dip2))
-        l_uni2.addWidget(self.btn_dip2)
-        layout_egitim_ana.addWidget(grp_uni2)
-
-        right_layout.addWidget(grp_egitim_ana)
-        right_layout.addStretch()
-        columns_layout.addLayout(right_layout, 6) 
+        self.ui['okul1'] = self._create_combo(editable=True)
+        self.ui['fakulte1'] = self._create_combo(editable=True)
+        self.ui['mezun_tarihi1'] = QLineEdit(); self.ui['mezun_tarihi1'].setPlaceholderText("GG.AA.YYYY")
+        self.ui['diploma_no1'] = QLineEdit()
+        self.btn_dip1 = QPushButton("Dosya Seç"); self.btn_dip1.clicked.connect(lambda: self._dosya_sec('Diploma1', self.btn_dip1))
+        
+        edu_1_lay.addWidget(QLabel("<b>1. Okul / Lisans</b>"))
+        self._add_v_field(edu_1_lay, "Okul Adı", self.ui['okul1'])
+        self._add_v_field(edu_1_lay, "Bölüm/Fakülte", self.ui['fakulte1'])
+        
+        row_edu_1 = QHBoxLayout()
+        self._add_v_field(row_edu_1, "Mezuniyet Tar.", self.ui['mezun_tarihi1'])
+        self._add_v_field(row_edu_1, "Diploma No", self.ui['diploma_no1'])
+        edu_1_lay.addLayout(row_edu_1)
+        self._add_v_field(edu_1_lay, "Diploma Dosyası", self.btn_dip1)
+        
+        # Okul 2
+        edu_2_widget = QWidget()
+        edu_2_lay = QVBoxLayout(edu_2_widget)
+        edu_2_lay.setContentsMargins(0,0,0,0)
+        
+        self.ui['okul2'] = self._create_combo(editable=True)
+        self.ui['fakulte2'] = self._create_combo(editable=True)
+        self.ui['mezun_tarihi2'] = QLineEdit(); self.ui['mezun_tarihi2'].setPlaceholderText("GG.AA.YYYY")
+        self.ui['diploma_no2'] = QLineEdit()
+        self.btn_dip2 = QPushButton("Dosya Seç"); self.btn_dip2.clicked.connect(lambda: self._dosya_sec('Diploma2', self.btn_dip2))
+        
+        edu_2_lay.addWidget(QLabel("<b>2. Okul / Yüksek Lisans</b>"))
+        self._add_v_field(edu_2_lay, "Okul Adı", self.ui['okul2'])
+        self._add_v_field(edu_2_lay, "Bölüm/Fakülte", self.ui['fakulte2'])
+        
+        row_edu_2 = QHBoxLayout()
+        self._add_v_field(row_edu_2, "Mezuniyet Tar.", self.ui['mezun_tarihi2'])
+        self._add_v_field(row_edu_2, "Diploma No", self.ui['diploma_no2'])
+        edu_2_lay.addLayout(row_edu_2)
+        self._add_v_field(edu_2_lay, "Diploma Dosyası", self.btn_dip2)
+        
+        edu_main_lay.addWidget(edu_1_widget)
+        edu_main_lay.addWidget(self._create_v_line())
+        edu_main_lay.addWidget(edu_2_widget)
+        
+        content_layout.addWidget(edu_grp)
 
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
 
         # Footer
         footer = QHBoxLayout()
-        footer.setContentsMargins(10, 10, 10, 10)
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         
-        btn_iptal = QPushButton("İptal")
-        btn_iptal.setObjectName("btn_iptal") 
-        btn_iptal.setFixedSize(120, 45)
-        btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
+        self.btn_kaydet = QPushButton("✅ PERSONELİ KAYDET")
+        self.btn_kaydet.setObjectName("btn_kaydet")
+        self.btn_kaydet.setMinimumHeight(50)
+        self.btn_kaydet.setMinimumWidth(200)
+        self.btn_kaydet.clicked.connect(self._validasyon_ve_kaydet)
         
-        self.btn_kaydet = OrtakAraclar.create_button(self, "✅ Personel Kaydet", self._kaydet_baslat)
-        self.btn_kaydet.setObjectName("btn_kaydet") 
-        self.btn_kaydet.setFixedSize(180, 45)
+        btn_iptal = QPushButton("İPTAL")
+        btn_iptal.setObjectName("btn_iptal")
+        btn_iptal.setMinimumHeight(50)
+        btn_iptal.clicked.connect(lambda: pencereyi_kapat(self))
         
         footer.addWidget(self.progress)
         footer.addStretch()
         footer.addWidget(btn_iptal)
         footer.addWidget(self.btn_kaydet)
         main_layout.addLayout(footer)
-        
-    # --- YARDIMCI UI METODLARI ---
-    def _create_input_with_label(self, parent, label_text, placeholder=""):
-        container = QWidget(parent) 
-        lay = QVBoxLayout(container)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(5)
-        lbl = QLabel(label_text)
-        lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
-        inp = OrtakAraclar.create_line_edit(container, placeholder)
-        lay.addWidget(lbl)
-        lay.addWidget(inp)
-        return inp 
 
-    def _wrap_label_widget(self, label_text, widget):
-        container = QWidget() 
+    # --- YARDIMCI METODLAR ---
+    def _add_v_field(self, parent_layout, label_text, widget):
+        container = QWidget()
         lay = QVBoxLayout(container)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(5)
+        
         lbl = QLabel(label_text)
-        lbl.setStyleSheet("color: #b0b0b0; font-size: 11px; font-weight: bold; text-transform: uppercase;")
+        lbl.setStyleSheet("font-weight: bold; color: #aaa; font-size: 11px;")
+        
         lay.addWidget(lbl)
         lay.addWidget(widget)
-        return container
+        parent_layout.addWidget(container)
 
-    def _create_editable_combo(self, parent):
-        combo = OrtakAraclar.create_combo_box(parent)
-        combo.setEditable(True)
-        combo.setInsertPolicy(QComboBox.NoInsert)
-        combo.completer().setCompletionMode(QCompleter.PopupCompletion)
-        return combo
-        
-    def _create_combo_no_label(self, parent):
-        combo = QComboBox(parent)
-        return combo
+    def _create_v_line(self):
+        frame = QFrame()
+        frame.setFrameShape(QFrame.VLine)
+        frame.setFrameShadow(QFrame.Sunken)
+        return frame
+
+    def _create_combo(self, editable=False):
+        c = QComboBox()
+        c.setEditable(editable)
+        if editable:
+            c.setInsertPolicy(QComboBox.NoInsert)
+            c.completer().setCompletionMode(QCompleter.PopupCompletion)
+        return c
 
     def _baslangic_yukle(self):
-        self.loader = BaslangicYukleyici()
+        self.loader = BaslangicYukleyici(self.service)
         self.loader.veri_hazir.connect(self._verileri_doldur)
         self.loader.start()
 
-    def _verileri_doldur(self, veriler):
-        self.ui['hizmet_sinifi'].clear(); self.ui['hizmet_sinifi'].addItems(veriler.get('Hizmet_Sinifi', []))
-        self.ui['kadro_unvani'].clear(); self.ui['kadro_unvani'].addItems(veriler.get('Kadro_Unvani', []))
-        self.ui['gorev_yeri'].clear(); self.ui['gorev_yeri'].addItems(veriler.get('Gorev_Yeri', []))
-        for field, key in [('dogum_yeri', 'Sehirler'), ('okul1', 'Okullar'), ('okul2', 'Okullar'), 
-                           ('fakulte1', 'Bolumler'), ('fakulte2', 'Bolumler')]:
-            self.ui[field].clear(); self.ui[field].addItems(veriler.get(key, []))
-            self.ui[field].setCurrentIndex(-1); self.ui[field].setPlaceholderText("Seçiniz veya yazınız...")
-        self.drive_config = veriler.get('Drive_Klasor', {})
+    def _verileri_doldur(self, d):
+        self.ui['hizmet_sinifi'].addItems(d.get('Hizmet_Sinifi', []))
+        self.ui['kadro_unvani'].addItems(d.get('Kadro_Unvani', []))
+        self.ui['gorev_yeri'].addItems(d.get('Gorev_Yeri', []))
+        
+        self.ui['dogum_yeri'].addItems(d.get('Sehirler', []))
+        self.ui['okul1'].addItems(d.get('Okullar', []))
+        self.ui['okul2'].addItems(d.get('Okullar', []))
+        self.ui['fakulte1'].addItems(d.get('Bolumler', []))
+        self.ui['fakulte2'].addItems(d.get('Bolumler', []))
+        
+        for k, v in self.ui.items():
+            if isinstance(v, QComboBox): v.setCurrentIndex(-1)
 
     def _resim_sec(self):
-        d, _ = QFileDialog.getOpenFileName(self, "Fotoğraf Seç", "", "Resim (*.jpg *.png *.jpeg)")
+        d, _ = QFileDialog.getOpenFileName(self, "Fotoğraf", "", "*.jpg *.png")
         if d: 
             self.dosya_yollari["Resim"] = d
-            self.lbl_resim_onizleme.setPixmap(QPixmap(d).scaled(140, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.lbl_resim_onizleme.setPixmap(QPixmap(d).scaled(130, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def _dosya_sec(self, key, btn):
-        d, _ = QFileDialog.getOpenFileName(self, "Dosya Seç", "", "Dosya (*.pdf *.jpg *.png)")
-        if d: 
+        d, _ = QFileDialog.getOpenFileName(self, "Dosya", "", "*.pdf *.jpg")
+        if d:
             self.dosya_yollari[key] = d
-            btn.setText(f"✅ Seçildi: {os.path.basename(d)[:15]}...")
-            btn.setStyleSheet("background-color: #2e7d32; color: white;") 
+            btn.setText("✅ Seçildi")
+            btn.setStyleSheet("color: #4CAF50; font-weight: bold;")
+
+    def _validasyon_ve_kaydet(self):
+        hatalar = []
+        if not self.ui['tc'].text(): hatalar.append("TC Kimlik No zorunludur.")
+        if not self.ui['ad_soyad'].text(): hatalar.append("Ad Soyad zorunludur.")
+        if not self.ui['hizmet_sinifi'].currentText(): hatalar.append("Hizmet Sınıfı seçilmelidir.")
+        
+        tc_ok, tc_err = Validator.validate_tc(self.ui['tc'].text())
+        if not tc_ok: hatalar.append(tc_err)
+        
+        tel_ok, tel_err = Validator.validate_phone(self.ui['cep_tel'].text())
+        if not tel_ok: hatalar.append(tel_err)
+        
+        mail_ok, mail_err = Validator.validate_email(self.ui['eposta'].text())
+        if not mail_ok: hatalar.append(mail_err)
+
+        if hatalar:
+            show_error("Giriş Hatası", "\n".join(hatalar), self)
+            return
+
+        self._kaydet_baslat()
 
     def _kaydet_baslat(self):
-        if not validate_required_fields([self.ui['tc'], self.ui['ad_soyad'], self.ui['hizmet_sinifi']]): return
         self.btn_kaydet.setEnabled(False); self.btn_kaydet.setText("Kaydediliyor...")
-        self.progress.setVisible(True); self.progress.setRange(0, 0) 
+        self.progress.setVisible(True); self.progress.setRange(0, 0)
         
-        data = {}
-        for k, v in self.ui.items():
-            if isinstance(v, QComboBox): data[k] = v.currentText()
-            elif isinstance(v, QDateEdit): data[k] = v.date().toString("dd.MM.yyyy")
-            elif isinstance(v, QLineEdit): data[k] = v.text()
-            else: data[k] = ""
-        self.worker = KayitWorker(data, self.dosya_yollari, self.drive_config)
+        data = {
+            'Kimlik_No': self.ui['tc'].text(),
+            'Ad_Soyad': self.ui['ad_soyad'].text(),
+            'Dogum_Yeri': self.ui['dogum_yeri'].currentText(),
+            'Dogum_Tarihi': self.ui['dogum_tarihi'].text(),
+            'Hizmet_Sinifi': self.ui['hizmet_sinifi'].currentText(),
+            'Kadro_Unvani': self.ui['kadro_unvani'].currentText(),
+            'Gorev_Yeri': self.ui['gorev_yeri'].currentText(),
+            'Kurum_Sicil_No': self.ui['sicil_no'].text(),
+            'Memuriyete_Baslama_Tarihi': self.ui['baslama_tarihi'].text(),
+            'Cep_Telefonu': self.ui['cep_tel'].text(),
+            'E_posta': self.ui['eposta'].text(),
+            'Mezun_Olunan_Okul': self.ui['okul1'].currentText(),
+            'Mezun_Olunan_Fakülte': self.ui['fakulte1'].currentText(),
+            'Mezuniyet_Tarihi': self.ui['mezun_tarihi1'].text(),
+            'Diploma_No': self.ui['diploma_no1'].text(),
+            'Mezun_Olunan_Okul_2': self.ui['okul2'].currentText(),
+            'Mezun_Olunan_Fakülte_2': self.ui['fakulte2'].currentText(),
+            'Mezuniyet_Tarihi_2': self.ui['mezun_tarihi2'].text(),
+            'Diploma_No_2': self.ui['diploma_no2'].text(),
+            'Durum': 'Aktif'
+        }
+        
+        self.worker = KayitWorker(self.service, data, self.dosya_yollari, self.kullanici_adi)
         self.worker.islem_tamam.connect(self._on_success)
         self.worker.hata_olustu.connect(self._on_error)
         self.worker.start()
 
     def _on_success(self):
         self.progress.setRange(0, 100); self.progress.setValue(100)
-        self.btn_kaydet.setText("Personel Kaydet"); self.btn_kaydet.setEnabled(True)
-        show_info("Başarılı", "Kayıt Başarılı.", self); pencereyi_kapat(self)
+        self.btn_kaydet.setText("✅ PERSONELİ KAYDET"); self.btn_kaydet.setEnabled(True)
+        show_info("Başarılı", "Personel başarıyla kaydedildi.", self)
+        pencereyi_kapat(self)
 
     def _on_error(self, err):
         self.progress.setVisible(False); self.btn_kaydet.setEnabled(True)
-        self.btn_kaydet.setText("Personel Kaydet"); show_error("Kayıt Hatası", err, self)
+        self.btn_kaydet.setText("✅ PERSONELİ KAYDET")
+        show_error("Kayıt Hatası", err, self)
 
     def closeEvent(self, event):
         if hasattr(self, 'loader') and self.loader.isRunning(): self.loader.quit(); self.loader.wait(500)
@@ -576,9 +497,9 @@ class PersonelEklePenceresi(QWidget):
 if __name__ == "__main__":
     app = QApplication([])
     try:
+        from temalar.tema import TemaYonetimi
         TemaYonetimi.uygula_fusion_dark(app)
-    except Exception as e:
-        print(f"Tema uygulanamadı: {e}")
+    except: pass
     win = PersonelEklePenceresi()
     win.show()
     app.exec()

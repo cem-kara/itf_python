@@ -22,11 +22,15 @@ if root_dir not in sys.path:
 # --- MODÜLLER ---
 try:
     from araclar.yetki_yonetimi import YetkiYoneticisi
-    from araclar.ortak_araclar import OrtakAraclar, show_info, show_error, show_question, pencereyi_kapat, kayitlari_getir, satir_ekle
+    from araclar.ortak_araclar import OrtakAraclar, show_info, show_error, show_question, pencereyi_kapat
     from temalar.tema import TemaYonetimi
-    from google_baglanti import veritabani_getir
+    
+    # 🚀 YENİ: Service
+    from services.personel_service import PersonelService
+    
 except ImportError as e:
     print(f"Modül Hatası: {e}")
+    PersonelService = None
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,235 +56,68 @@ class DateTableWidgetItem(QTableWidgetItem):
 class IzinGecmisiWorker(QThread):
     veri_indi = Signal(list)
     
-    def __init__(self, tc_no):
+    def __init__(self, service, tc_no):
         super().__init__()
+        self.service = service
         self.tc_no = tc_no 
 
     def run(self):
         try:
-            tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
-            personel_izinleri = []
-            if tum_izinler:
-                for x in tum_izinler:
-                    p_id = str(x.get('personel_id', '')).strip()
-                    if p_id == str(self.tc_no).strip():
-                        personel_izinleri.append(x)
-            self.veri_indi.emit(personel_izinleri)
-        except Exception as e: 
+            data = self.service.izin_gecmisi(self.tc_no)
+            self.veri_indi.emit(data)
+        except Exception: 
             self.veri_indi.emit([])
 
 # =============================================================================
-# WORKER: KAYIT + BAKİYE DÜŞME (GÜNCELLENDİ)
+# WORKER: KAYIT İŞLEMİ
 # =============================================================================
 class IzinKayitWorker(QThread):
     islem_tamam = Signal()
     hata_olustu = Signal(str)
     
-    def __init__(self, veri):
+    def __init__(self, service, veri):
         super().__init__()
-        self.veri = veri # [Id, Hizmet_Sinifi, personel_id, Ad_Soyad, izin_tipi, Başlama_Tarihi, Gun, Bitiş_Tarihi, Durum]
+        self.service = service
+        self.veri = veri 
 
     def run(self):
         try:
-            hedef_tc = str(self.veri[2]).strip()
-            try:
-                yeni_bas = datetime.strptime(self.veri[5], "%d.%m.%Y")
-                yeni_bit = datetime.strptime(self.veri[7], "%d.%m.%Y")
-            except ValueError:
-                raise Exception("Tarih formatı hatalı.")
-
-            # --- 1. TARİH ARALIĞI ÇAKIŞMA KONTROLÜ ---
-            tum_izinler = kayitlari_getir(veritabani_getir, 'personel', 'izin_giris')
-            
-            if tum_izinler:
-                for kayit in tum_izinler:
-                    durum = str(kayit.get('Durum', '')).strip()
-                    if durum == "İptal Edildi": continue
-
-                    vt_tc = str(kayit.get('personel_id', '')).strip()
-                    if vt_tc != hedef_tc: continue
-
-                    try:
-                        vt_bas = self._parse_date(str(kayit.get('Başlama_Tarihi')))
-                        vt_bit = self._parse_date(str(kayit.get('Bitiş_Tarihi')))
-                        
-                        # Çakışma Mantığı
-                        if (yeni_bas <= vt_bit) and (yeni_bit >= vt_bas):
-                            raise Exception(f"HATA: {vt_bas.strftime('%d.%m.%Y')} - {vt_bit.strftime('%d.%m.%Y')} tarihleri arasında zaten bir izin mevcut!")
-                    except ValueError:
-                        continue 
-
-            # --- 2. KAYIT ---
-            basari = satir_ekle(veritabani_getir, 'personel', 'izin_giris', self.veri)
-            if not basari: raise Exception("Kayıt işlemi başarısız oldu (API hatası).")
-
-            # --- 3. BAKİYE DÜŞME ---
-            self._bakiye_guncelle(hedef_tc, self.veri[4], int(self.veri[6]), islem="dus")
-
-            self.islem_tamam.emit()
+            basari, msg = self.service.izin_kaydet(self.veri)
+            if basari:
+                self.islem_tamam.emit()
+            else:
+                self.hata_olustu.emit(msg)
         except Exception as e: 
             self.hata_olustu.emit(str(e))
 
-    def _parse_date(self, text):
-        for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"):
-            try: return datetime.strptime(text, fmt)
-            except ValueError: continue
-        raise ValueError("Tarih hatası")
-
-    def _bakiye_guncelle(self, tc, izin_tipi, gun, islem="dus"):
-        """izin_bilgi tablosunu günceller."""
-        try:
-            ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
-            if not ws_bilgi: return
-
-            tum_tc = ws_bilgi.col_values(1) # TC 1. sütun varsayımı
-            # Daha güvenli: Başlık ara
-            headers = ws_bilgi.row_values(1)
-            try: c_tc = headers.index("TC_Kimlik") + 1
-            except: c_tc = 2
-            
-            tum_tc = ws_bilgi.col_values(c_tc)
-            try: row_idx = tum_tc.index(tc) + 1
-            except: return 
-
-            def get_col(n): return headers.index(n) + 1
-            def safe_int(v):
-                try: return int(v)
-                except: return 0
-
-            katsayi = 1 if islem == "dus" else -1
-            tip_str = str(izin_tipi).lower()
-
-            if "yıllık" in tip_str:
-                c_kul = get_col("Yillik_Kullanilan")
-                c_hak = get_col("Yillik_Toplam_Hak")
-                c_kal = get_col("Yillik_Kalan")
-                
-                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kul).value)
-                top_hak = safe_int(ws_bilgi.cell(row_idx, c_hak).value)
-                
-                yeni_kul = max(0, mevcut_kul + (gun * katsayi))
-                ws_bilgi.update_cell(row_idx, c_kul, yeni_kul)
-                ws_bilgi.update_cell(row_idx, c_kal, top_hak - yeni_kul)
-            
-            elif "şua" in tip_str or "sua" in tip_str:
-                c_kul = get_col("Sua_Kullanilan")
-                c_hak = get_col("Sua_Hakedis")
-                c_kal = get_col("Sua_Kalan")
-                
-                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kul).value)
-                top_hak = safe_int(ws_bilgi.cell(row_idx, c_hak).value)
-                
-                yeni_kul = max(0, mevcut_kul + (gun * katsayi))
-                ws_bilgi.update_cell(row_idx, c_kul, yeni_kul)
-                ws_bilgi.update_cell(row_idx, c_kal, top_hak - yeni_kul)
-            else:
-                try:
-                    c_diger = get_col("Rapor_Mazeret_Top")
-                    mevcut = safe_int(ws_bilgi.cell(row_idx, c_diger).value)
-                    ws_bilgi.update_cell(row_idx, c_diger, max(0, mevcut + (gun * katsayi)))
-                except: pass
-
-        except Exception as e:
-            print(f"Bakiye hatası: {e}")
-
 # =============================================================================
-# WORKER: İPTAL + BAKİYE İADE (GÜNCELLENDİ)
+# WORKER: İPTAL İŞLEMİ
 # =============================================================================
 class IzinIptalWorker(QThread):
     islem_tamam = Signal()
     hata_olustu = Signal(str)
     
-    def __init__(self, kayit_id):
+    def __init__(self, service, kayit_id, tc, tip, gun):
         super().__init__()
+        self.service = service
         self.kayit_id = kayit_id
+        self.tc = tc
+        self.tip = tip
+        self.gun = gun
 
     def run(self):
         try:
-            ws = veritabani_getir('personel', 'izin_giris')
-            cell = ws.find(str(self.kayit_id))
-            
-            if cell:
-                row_data = ws.row_values(cell.row)
-                basliklar = ws.row_values(1)
-                
-                try:
-                    idx_durum = basliklar.index("Durum") + 1
-                    idx_tc = basliklar.index("personel_id")
-                    idx_gun = basliklar.index("Gun")
-                    idx_tip = basliklar.index("izin_tipi")
-                    
-                    tc = row_data[idx_tc]
-                    gun = int(row_data[idx_gun])
-                    tip = row_data[idx_tip]
-                    durum = row_data[idx_durum-1]
-                except:
-                    # Yedek indeksler
-                    tc = row_data[2]; tip = row_data[4]; gun = int(row_data[6]); durum = row_data[8]; idx_durum = 9
-
-                if durum == "İptal Edildi": raise Exception("Zaten iptal edilmiş.")
-
-                # 1. Durumu Güncelle
-                ws.update_cell(cell.row, idx_durum, "İptal Edildi")
-                
-                # 2. İade Yap
-                self._iade_et(tc, tip, gun)
+            basari, msg = self.service.izin_iptal_et(self.kayit_id, self.tc, self.tip, self.gun)
+            if basari:
                 self.islem_tamam.emit()
             else:
-                raise Exception("İlgili kayıt bulunamadı.")
+                self.hata_olustu.emit(msg)
         except Exception as e:
             self.hata_olustu.emit(str(e))
 
-    def _iade_et(self, tc, tip, gun):
-        """Bakiyeyi iade eder (KayitWorker mantığıyla aynı, sadece işlem tersi)."""
-        try:
-            ws_bilgi = veritabani_getir('personel', 'izin_bilgi')
-            headers = ws_bilgi.row_values(1)
-            try: c_tc = headers.index("TC_Kimlik") + 1
-            except: c_tc = 2
-            
-            tum_tc = ws_bilgi.col_values(c_tc)
-            if tc not in tum_tc: return
-            row_idx = tum_tc.index(tc) + 1
-            
-            def get_col(n): return headers.index(n) + 1
-            def safe_int(v): 
-                try: return int(v) 
-                except: return 0
-
-            tip_str = str(tip).lower()
-            
-            if "yıllık" in tip_str:
-                c_kul = get_col("Yillik_Kullanilan")
-                c_hak = get_col("Yillik_Toplam_Hak")
-                c_kal = get_col("Yillik_Kalan")
-                
-                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kul).value)
-                top_hak = safe_int(ws_bilgi.cell(row_idx, c_hak).value)
-                
-                yeni_kul = max(0, mevcut_kul - gun) # İade = Azalt
-                ws_bilgi.update_cell(row_idx, c_kul, yeni_kul)
-                ws_bilgi.update_cell(row_idx, c_kal, top_hak - yeni_kul)
-                
-            elif "şua" in tip_str or "sua" in tip_str:
-                c_kul = get_col("Sua_Kullanilan")
-                c_hak = get_col("Sua_Hakedis")
-                c_kal = get_col("Sua_Kalan")
-                
-                mevcut_kul = safe_int(ws_bilgi.cell(row_idx, c_kul).value)
-                top_hak = safe_int(ws_bilgi.cell(row_idx, c_hak).value)
-                
-                yeni_kul = max(0, mevcut_kul - gun)
-                ws_bilgi.update_cell(row_idx, c_kul, yeni_kul)
-                ws_bilgi.update_cell(row_idx, c_kal, top_hak - yeni_kul)
-            else:
-                c_diger = get_col("Rapor_Mazeret_Top")
-                mevcut = safe_int(ws_bilgi.cell(row_idx, c_diger).value)
-                ws_bilgi.update_cell(row_idx, c_diger, max(0, mevcut - gun))
-        except: pass
-
-# ================= ANA FORM =================
-
+# =============================================================================
+# ANA FORM
+# =============================================================================
 class IzinTakipPenceresi(QWidget):
     def __init__(self, personel_data, yetki='viewer', kullanici_adi=None):
         super().__init__()
@@ -288,15 +125,18 @@ class IzinTakipPenceresi(QWidget):
         self.tc_no = str(personel_data[0]) 
         self.ad_soyad = str(personel_data[1])
         
-        try: self.hizmet_sinifi = str(personel_data[4])
-        except IndexError: self.hizmet_sinifi = "Belirtilmemiş"
+        try: self.hizmet_sinifi = str(personel_data[3]) # Index 4 yerine 3 olabilir, tablodaki sıraya dikkat
+        except IndexError: self.hizmet_sinifi = "Genel"
+        
+        self.service = PersonelService()
         
         self.setWindowTitle(f"İzin Girişi - {self.ad_soyad}")
         self.resize(1000, 600)
         self._setup_ui()
         self._verileri_yukle()
         
-        YetkiYoneticisi.uygula(self, "izin_takip")
+        try: YetkiYoneticisi.uygula(self, "izin_takip")
+        except: pass
 
     def _setup_ui(self):
         main_layout = QHBoxLayout(self)
@@ -374,7 +214,7 @@ class IzinTakipPenceresi(QWidget):
     def _verileri_yukle(self):
         self.progress.setVisible(True)
         self.table.setRowCount(0)
-        self.worker = IzinGecmisiWorker(self.tc_no)
+        self.worker = IzinGecmisiWorker(self.service, self.tc_no)
         self.worker.veri_indi.connect(self._tablo_doldur)
         self.worker.start()
 
@@ -383,10 +223,10 @@ class IzinTakipPenceresi(QWidget):
         if not veri: return
         
         self.table.setRowCount(len(veri))
+        # Veriyi ters çevirip göster (En yeni en üstte)
         for i, row in enumerate(reversed(veri)):
             self.table.setItem(i, 0, QTableWidgetItem(str(row.get('Id', ''))))
             self.table.setItem(i, 1, QTableWidgetItem(str(row.get('izin_tipi', ''))))
-            # Tarih sıralaması için özel öğe
             self.table.setItem(i, 2, DateTableWidgetItem(str(row.get('Başlama_Tarihi', ''))))
             self.table.setItem(i, 3, DateTableWidgetItem(str(row.get('Bitiş_Tarihi', ''))))
             self.table.setItem(i, 4, QTableWidgetItem(str(row.get('Gun', ''))))
@@ -429,10 +269,12 @@ class IzinTakipPenceresi(QWidget):
 
     def _iptal_et(self, row):
         if show_question("Onay", "İzin iptal edilecek ve bakiyeye iade edilecek.\nEmin misiniz?", self):
-            kayit_id = self.table.item(row, 0).text() # Gizli ID
+            kayit_id = self.table.item(row, 0).text()
+            tip = self.table.item(row, 1).text()
+            gun = int(self.table.item(row, 4).text())
             
             self.progress.setVisible(True)
-            self.i_worker = IzinIptalWorker(kayit_id)
+            self.i_worker = IzinIptalWorker(self.service, kayit_id, self.tc_no, tip, gun)
             self.i_worker.islem_tamam.connect(lambda: (show_info("Başarılı", "İzin iptal edildi.", self), self._verileri_yukle()))
             self.i_worker.hata_olustu.connect(lambda e: (show_error("Hata", e, self), self.progress.setVisible(False)))
             self.i_worker.start()
@@ -445,6 +287,7 @@ class IzinTakipPenceresi(QWidget):
         unique_id = int(time.time())
         gun_sayisi = self.dt_baslama.date().daysTo(self.dt_bitis.date())
         
+        # [Id, Hizmet_Sinifi, personel_id, Ad_Soyad, izin_tipi, Başlama_Tarihi, Gun, Bitiş_Tarihi, Durum]
         veri_listesi = [
             unique_id,
             self.hizmet_sinifi,
@@ -457,7 +300,7 @@ class IzinTakipPenceresi(QWidget):
             "İşlendi"
         ]
         
-        self.k_worker = IzinKayitWorker(veri_listesi)
+        self.k_worker = IzinKayitWorker(self.service, veri_listesi)
         self.k_worker.islem_tamam.connect(self._kayit_basarili)
         self.k_worker.hata_olustu.connect(self._kayit_hata)
         self.k_worker.start()
@@ -476,6 +319,6 @@ if __name__ == "__main__":
     app = QApplication([])
     try: TemaYonetimi.uygula_fusion_dark(app)
     except: pass
-    win = IzinTakipPenceresi(["11111111111", "Ahmet Yılmaz", "", "", "Teknik Hizmetler"])
+    win = IzinTakipPenceresi(["11111111111", "Ahmet Yılmaz", "", "Teknik Hizmetler"])
     win.show()
     app.exec()
