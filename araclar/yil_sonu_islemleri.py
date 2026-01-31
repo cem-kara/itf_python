@@ -3,16 +3,13 @@ import sys
 import os
 import time
 from datetime import datetime
-import logging
+
+# PySide6 Kütüphaneleri
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTextEdit, 
                                QProgressBar, QLabel, QMessageBox, QCheckBox, 
                                QGroupBox, QApplication)
 from PySide6.QtCore import Qt, QThread, Signal
-from araclar.ortak_araclar import show_toast # Yeni bildirim sistemi
-from araclar.yetki_yonetimi import YetkiYoneticisi # Yetki kontrolü
 
-# Logger tanımı
-logger = logging.getLogger(__name__)
 # --- YOL AYARLARI ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
@@ -148,11 +145,10 @@ class DevirWorker(QThread):
             
             self.log_sinyali.emit("✅ Yıl sonu devir işlemi başarıyla tamamlandı!")
             self.islem_bitti.emit()
-            logger.info("Yıl sonu devir işlemi başlatıldı.")
-            
+
         except Exception as e:
-            logger.error(f"Devir işlemi sırasında kritik hata: {e}", exc_info=True)
-            self.log_sinyali.emit(f"❌ HATA: {str(e)}")
+            self.log_sinyali.emit(f"❌ KRİTİK HATA: {str(e)}")
+            self.islem_bitti.emit()
 
     def _hizmet_yili_hesapla(self, tarih_str):
         try:
@@ -174,8 +170,6 @@ class YilSonuDevirYoneticisi(QWidget):
         self.setWindowTitle("Yıl Sonu Devir İşlemleri")
         self.resize(600, 500)
         self.setup_ui()
-
-        YetkiYoneticisi.form_yetkilerini_uygul(self, "yil_sonu_devir")
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -221,7 +215,6 @@ class YilSonuDevirYoneticisi(QWidget):
         self.btn_baslat.setStyleSheet("background-color: #333; color: #aaa; font-weight: bold; font-size: 14px;")
         self.btn_baslat.clicked.connect(self._islemi_baslat)
         layout.addWidget(self.btn_baslat)
-        pass
 
     def _onay_degisti(self):
         if self.chk_onay.isChecked():
@@ -232,8 +225,6 @@ class YilSonuDevirYoneticisi(QWidget):
             self.btn_baslat.setStyleSheet("background-color: #333; color: #aaa; font-weight: bold; font-size: 14px;")
 
     def _islemi_baslat(self):
-        logger.warning("Kullanıcı yıl sonu devir işlemini onayladı ve başlattı.")
-        show_toast("İşlem Başlatıldı", type="info")
         self.btn_baslat.setEnabled(False)
         self.chk_onay.setEnabled(False)
         self.pbar.setVisible(True)
@@ -246,8 +237,6 @@ class YilSonuDevirYoneticisi(QWidget):
         self.worker.start()
 
     def _islem_bitti(self):
-        show_toast("Yıl Sonu Devri Başarıyla Tamamlandı", type="success", duration=5000)
-        logger.info("Yıl sonu devri başarıyla bitti.")
         self.chk_onay.setChecked(False)
         self.chk_onay.setEnabled(True)
         QMessageBox.information(self, "Bilgi", "İşlem tamamlandı.")

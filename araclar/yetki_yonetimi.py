@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-import logging
-from araclar.ortak_araclar import show_toast
-from araclar.log_yonetimi import LogYoneticisi
-
-# Standart Logger tanımı
-logger = logging.getLogger(__name__)
 
 # --- YOL AYARLARI ---
+# Bu dosya 'araclar' klasöründe olduğu için kök dizini buluyoruz
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 if root_dir not in sys.path:
@@ -17,7 +12,7 @@ if root_dir not in sys.path:
 try:
     from google_baglanti import veritabani_getir
 except ImportError:
-    logger.critical("HATA: google_baglanti modülü bulunamadı.")
+    print("HATA: google_baglanti modülü bulunamadı.")
     def veritabani_getir(t, s): return None
 
 class YetkiYoneticisi:
@@ -27,79 +22,88 @@ class YetkiYoneticisi:
     """
     
     # Hafızada tutulacak yetki haritası
+    # Yapı: { 'form_kodu': { 'btn_adi': 'GIZLE', 'menu_adi': 'PASIF' } }
     _yetki_cache = {} 
     _aktif_rol = "viewer"
 
     @staticmethod
     def yetkileri_yukle(aktif_rol):
         """
-        Veritabanından o role ait kısıtlamaları çeker.
+        Login işlemi sonrası çağrılır. Veritabanından o role ait kısıtlamaları çeker.
         """
         YetkiYoneticisi._aktif_rol = aktif_rol
         YetkiYoneticisi._yetki_cache = {}
 
+        print(f"Yetkiler yükleniyor... Rol: {aktif_rol}")
+
         try:
-            # Not: Veritabanı sekme adınızın 'Rol_Yetkileri' olduğundan emin olun
+            # Sabitler veritabanındaki 'Rol_Yetkileri' sayfasına bağlan
             ws = veritabani_getir('sabit', 'Rol_Yetkileri')
             
             if not ws:
-                logger.error("Yetki tablosuna ulaşılamadı.")
+                print("UYARI: 'Rol_Yetkileri' sayfasına erişilemedi veya sayfa yok.")
                 return
 
             records = ws.get_all_records()
-            count = 0
             
+            count = 0
             for row in records:
+                # Veritabanı Sütunları: Rol | Form_Kodu | Oge_Adi | Islem
                 db_rol = str(row.get('Rol', '')).strip()
                 
+                # Sadece şu anki kullanıcının rolüne ait kuralları al
                 if db_rol == aktif_rol:
-                    f_kod = str(row.get('Form_Kodu', '')).strip()
-                    o_adi = str(row.get('Oge_Adi', '')).strip()
-                    islem = str(row.get('Islem', '')).strip().upper()
-
-                    if not f_kod or not o_adi:
+                    form_kodu = str(row.get('Form_Kodu', '')).strip()
+                    oge_adi = str(row.get('Oge_Adi', '')).strip()
+                    islem = str(row.get('Islem', '')).strip().upper() # GIZLE / PASIF
+                    
+                    if not form_kodu or not oge_adi:
                         continue
 
-                    if f_kod not in YetkiYoneticisi._yetki_cache:
-                        YetkiYoneticisi._yetki_cache[f_kod] = {}
+                    # Cache sözlüğünü hazırla
+                    if form_kodu not in YetkiYoneticisi._yetki_cache:
+                        YetkiYoneticisi._yetki_cache[form_kodu] = {}
                     
-                    YetkiYoneticisi._yetki_cache[f_kod][o_adi] = islem
+                    YetkiYoneticisi._yetki_cache[form_kodu][oge_adi] = islem
                     count += 1
             
-            logger.info(f"Yetkiler yüklendi. Rol: {aktif_rol}, Kural Sayısı: {count}")
-            
+            print(f"-> {count} adet kısıtlama kuralı yüklendi.")
+
         except Exception as e:
-            logger.error(f"Yetki yükleme hatası: {e}", exc_info=True)
+            print(f"Yetki yükleme sırasında hata: {e}")
 
     @staticmethod
-    def form_yetkilerini_uygul(form_instance, form_kodu):
+    def uygula(form_instance, form_kodu):
         """
-        Bir forma yetki kurallarını uygular.
+        Bir forma (pencereye) yetki kurallarını uygular.
+        Formun __init__ veya setup_ui metodunun sonunda çağrılmalıdır.
+        
+        Args:
+            form_instance (self): Formun kendisi (QWidget)
+            form_kodu (str): Veritabanındaki 'Form_Kodu' (örn: 'personel_listesi')
         """
+        # Eğer bu form için hiç kural yoksa çık
         if form_kodu not in YetkiYoneticisi._yetki_cache:
             return 
 
         kurallar = YetkiYoneticisi._yetki_cache[form_kodu]
 
         for oge_adi, islem in kurallar.items():
+            # Formun içinde bu isme sahip bir widget var mı?
             if hasattr(form_instance, oge_adi):
                 widget = getattr(form_instance, oge_adi)
+                
                 try:
                     if islem == 'GIZLE':
                         widget.setVisible(False)
+                        print(f"Yetki: {form_kodu} -> {oge_adi} GİZLENDİ.")
+                        
                     elif islem == 'PASIF':
                         widget.setEnabled(False)
-                    
-                    logger.debug(f"Yetki uygulandı: {form_kodu} -> {oge_adi} ({islem})")
+                        print(f"Yetki: {form_kodu} -> {oge_adi} PASİF YAPILDI.")
+                        
                 except Exception as e:
-                    logger.error(f"Yetki uygulama hatası ({oge_adi}): {e}")
+                    print(f"Hata: {oge_adi} üzerinde işlem yapılamadı. ({e})")
             else:
-                logger.warning(f"Yetki kuralı var ama widget bulunamadı: {form_kodu} -> {oge_adi}")
-
-    @staticmethod
-    def uygula(form_instance, form_kodu):
-        """
-        Geriye uyumluluk için eklenmiştir. 
-        main.py içindeki YetkiYoneticisi.uygula çağrılarının hata vermesini engeller.
-        """
-        YetkiYoneticisi.form_yetkilerini_uygul(form_instance, form_kodu)
+                # Geliştirici için uyarı (Widget ismini yanlış yazmış olabilirsiniz)
+                print(f"UYARI: {form_kodu} formunda '{oge_adi}' isimli bir nesne bulunamadı.")
